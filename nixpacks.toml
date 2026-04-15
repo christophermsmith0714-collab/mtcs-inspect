@@ -1,0 +1,5 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "python3", "python3Packages.pip", "python3Packages.reportlab", "python3Packages.pillow"]
+
+[start]
+cmd = "NODE_ENV=production node dist/index.cjs"
