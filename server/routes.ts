@@ -393,7 +393,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       const safeData = validation.data;
 
-      const pyPath = path.join(__dirname, "..", "server", "pdf_generator.py");
+      // In production, pdf_generator.py is copied to dist/ alongside index.cjs
+      const pyPath = path.join(__dirname, "pdf_generator.py");
       const py = spawn("python3", [pyPath], { stdio: ["pipe", "pipe", "pipe"] });
 
       let stdout = Buffer.alloc(0);
