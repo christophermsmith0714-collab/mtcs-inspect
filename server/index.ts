@@ -31,10 +31,10 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    httpOnly: true,       // Not accessible via JS (XSS protection)
-    sameSite: "lax",      // CSRF protection; "strict" breaks cross-origin iframe
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     maxAge: 8 * 60 * 60 * 1000, // 8-hour sessions
-    secure: process.env.NODE_ENV === "production", // HTTPS on Railway/Render
+    secure: process.env.NODE_ENV === "production",
   },
 }));
 
