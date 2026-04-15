@@ -18,6 +18,51 @@ export function registerHealthCheck(app: Express) {
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
+
+  // ── Diagnostic: check DB state (remove after debugging) ────────────────────
+  app.get("/api/debug/db", async (_req, res) => {
+    try {
+      const allUsers = storage.getAllUsers ? storage.getAllUsers() : [];
+      const templates = storage.getTemplates();
+      res.json({
+        userCount: allUsers.length,
+        templateCount: templates.length,
+        dbPath: process.env.DB_PATH || "default",
+        nodeEnv: process.env.NODE_ENV,
+      });
+    } catch (err: any) {
+      res.json({ error: err.message });
+    }
+  });
+
+  // ── Emergency admin reset (protected by reset token) ───────────────────────
+  app.post("/api/debug/reset-admin", async (req, res) => {
+    const { token, password } = req.body;
+    if (token !== process.env.SESSION_SECRET?.slice(0, 16)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    try {
+      const existing = storage.getUserByEmail("admin@mtcs.com");
+      if (existing) {
+        await storage.updateUser(existing.id, { password: password || "mtcs-admin-2026!" });
+        return res.json({ success: true, action: "updated" });
+      } else {
+        await storage.createUser({
+          name: "Chris Smith",
+          email: "admin@mtcs.com",
+          password: password || "mtcs-admin-2026!",
+          company: "Midwest Training and Consulting Services",
+          role: "admin",
+          subscriptionStatus: "active",
+          subscriptionStartDate: new Date().toISOString(),
+          assignedTemplates: "[1,2]",
+        });
+        return res.json({ success: true, action: "created" });
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 }
 
 // ── Helper: normalize assignedTemplates from DB → number[] ──────────────────
