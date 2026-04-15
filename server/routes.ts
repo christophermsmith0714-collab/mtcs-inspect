@@ -3,12 +3,12 @@ import type { Express } from "express";
 import { type Server } from "http";
 import express from "express";
 import { Resend } from "resend";
-import { spawn } from "child_process";
 import path from "path";
 import { z } from "zod";
 import { storage } from "./storage";
 import { insertUserSchema, insertInspectionSchema } from "@shared/schema";
 import { requireAuth, requireAdmin } from "./middleware";
+import { generatePDF } from "./pdf_node";
 
 // ── Resend from env — never hardcoded ────────────────────────────────────────
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -430,31 +430,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/generate-pdf",
     express.json({ limit: "20mb" }),
     requireAuth,
-    (req, res) => {
-      // Validate and whitelist all fields before passing to Python
+    async (req, res) => {
+      // Validate and whitelist all fields
       const validation = pdfSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ error: "Invalid PDF request data" });
       }
       const safeData = validation.data;
 
-      // In production, pdf_generator.py is copied to dist/ alongside index.cjs
-      const pyPath = path.join(__dirname, "pdf_generator.py");
-      const py = spawn("python3", [pyPath], { stdio: ["pipe", "pipe", "pipe"] });
+      try {
+        // Generate PDF using Node.js (no Python dependency)
+        const pdfBuffer = await generatePDF(safeData);
+        const base64 = pdfBuffer.toString("base64");
 
-      let stdout = Buffer.alloc(0);
-      let stderr = "";
-
-      py.stdout.on("data", (chunk: Buffer) => { stdout = Buffer.concat([stdout, chunk]); });
-      py.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
-
-      py.on("close", async (code: number) => {
-        if (code !== 0) {
-          console.error("PDF generator error:", stderr);
-          return res.status(500).json({ error: "PDF generation failed" });
-        }
-
-        const base64 = stdout.toString("utf8").trim();
         const sendTo = safeData.sendToEmail;
         const facility = safeData.facility;
         const inspDate = safeData.date;
@@ -506,15 +494,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
 
         res.json({ pdf: base64, emailSent, emailError: emailError || null });
-      });
-
-      py.on("error", (err: Error) => {
-        console.error("Failed to start pdf_generator.py:", err);
-        res.status(500).json({ error: "Failed to start PDF generator" });
-      });
-
-      py.stdin.write(JSON.stringify(safeData));
-      py.stdin.end();
+      } catch (err: any) {
+        console.error("PDF generation error:", err);
+        res.status(500).json({ error: "PDF generation failed: " + err.message });
+      }
     }
   );
 
