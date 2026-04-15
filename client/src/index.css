@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Environmental / industrial palette: deep forest green + warm slate */
+    --background: 210 20% 96%;
+    --foreground: 210 25% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 25% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 25% 12%;
+
+    --primary: 160 60% 25%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 210 15% 90%;
+    --secondary-foreground: 210 25% 20%;
+
+    --muted: 210 15% 93%;
+    --muted-foreground: 210 15% 45%;
+
+    --accent: 160 40% 88%;
+    --accent-foreground: 160 60% 20%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 210 15% 85%;
+    --input: 210 15% 85%;
+    --ring: 160 60% 25%;
+
+    --radius: 0.5rem;
+
+    --success: 140 55% 40%;
+    --warning: 38 90% 50%;
+    --danger: 4 80% 50%;
+  }
+
+  .dark {
+    --background: 220 18% 10%;
+    --foreground: 210 15% 88%;
+
+    --card: 220 16% 13%;
+    --card-foreground: 210 15% 88%;
+
+    --popover: 220 16% 13%;
+    --popover-foreground: 210 15% 88%;
+
+    --primary: 160 50% 45%;
+    --primary-foreground: 0 0% 5%;
+
+    --secondary: 220 15% 20%;
+    --secondary-foreground: 210 15% 75%;
+
+    --muted: 220 15% 18%;
+    --muted-foreground: 210 12% 50%;
+
+    --accent: 160 30% 20%;
+    --accent-foreground: 160 50% 65%;
+
+    --destructive: 0 65% 55%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 15% 22%;
+    --input: 220 15% 22%;
+    --ring: 160 50% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100dvh;
+    line-height: 1.6;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  img, picture, video, canvas, svg {
+    display: block;
+    max-width: 100%;
+  }
+  input, button, textarea, select {
+    font: inherit;
+    color: inherit;
+  }
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+/* Status badge utilities */
+.status-yes { @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400; }
+.status-no { @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400; }
+.status-na { @apply bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400; }
+.status-completed { @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400; }
+.status-in_progress { @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400; }
+
+/* Photo upload area */
+.photo-upload-zone {
+  @apply border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer transition-colors;
+}
+.photo-upload-zone:hover {
+  @apply border-primary bg-accent/30;
+}
+
+/* Print styles for reports */
+@media print {
+  .no-print { display: none !important; }
+  .print-break { page-break-before: always; }
+  body { background: white; color: black; }
+}
