@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import { apiRequest } from "./queryClient";
+import { apiRequest, setAuthToken } from "./queryClient";
 import type { Answer } from "./data";
 
 export type User = {
@@ -60,13 +60,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const err = await res.json();
       throw new Error(err.error || "Invalid credentials");
     }
-    const { user } = await res.json();
+    const { user, token } = await res.json();
+    // Store token in module-level variable — sent as Authorization: Bearer header
+    setAuthToken(token);
     setCurrentUser(user);
     return user;
   };
 
   const logout = async () => {
     try { await apiRequest("POST", "/api/auth/logout"); } catch {}
+    setAuthToken(null);  // Clear the Bearer token
     setCurrentUser(null);
     setInspections([]);
   };

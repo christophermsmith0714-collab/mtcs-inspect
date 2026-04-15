@@ -1,17 +1,15 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
-import session from "express-session";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { registerRoutes, registerHealthCheck } from "./routes";
 import { serveStatic } from "./static";
+import { extractAuth } from "./middleware";
 import { createServer } from "http";
 
-// ── Validate required env vars at startup ───────────────────────────────────
-const sessionSecret = process.env.SESSION_SECRET;
-if (!sessionSecret || sessionSecret.length < 32) {
-  throw new Error("SESSION_SECRET env var must be set (min 32 chars). Run: node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\"");
-}
+// ── NOTE: Switched from cookie-based sessions to Bearer token auth ─────────
+// express-session removed — tokens stored in SQLite auth_tokens table.
+// This fixes Railway HTTPS SameSite cookie blocking issues entirely.
 
 const app = express();
 const httpServer = createServer(app);
@@ -25,18 +23,9 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false, // Needed for iframe embedding on Perplexity
 }));
 
-// ── Sessions ─────────────────────────────────────────────────────────────────
-app.use(session({
-  secret: sessionSecret,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-    maxAge: 8 * 60 * 60 * 1000, // 8-hour sessions
-    secure: process.env.NODE_ENV === "production",
-  },
-}));
+// ── Token auth extraction ─────────────────────────────────────────────────────
+// Reads Authorization: Bearer <token> header, validates against DB, attaches to req
+app.use(extractAuth);
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
 // Strict limit on login — prevents brute force (10 attempts / 15 min)

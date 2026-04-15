@@ -7,13 +7,15 @@ import path from "path";
 import fs from "fs";
 import {
   users, inspectionTemplates, inspectionQuestions,
-  inspections, inspectionAnswers,
+  inspections, inspectionAnswers, authTokens,
   type User, type InsertUser,
   type InspectionTemplate, type InsertTemplate,
   type InspectionQuestion, type InsertQuestion,
   type Inspection, type InsertInspection,
   type InspectionAnswer, type InsertAnswer,
+  type AuthToken,
 } from "@shared/schema";
+import crypto from "crypto";
 
 // ── DB path: from env or default to ./data/spcc.db ──────────────────────────
 const dbPath = process.env.DB_PATH
@@ -79,6 +81,15 @@ sqlite.exec(`
     comments TEXT,
     photo_urls TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS auth_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL,
+    user_role TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
 `);
 
 // Safe migration: add assigned_templates if missing
@@ -88,6 +99,12 @@ try {
 
 // ── Storage Interface ────────────────────────────────────────────────────────
 export interface IStorage {
+  // Auth tokens
+  createToken(userId: number, userRole: string): AuthToken;
+  getToken(token: string): AuthToken | undefined;
+  deleteToken(token: string): void;
+  cleanExpiredTokens(): void;
+
   // Users — async due to bcrypt
   getUser(id: number): User | undefined;
   getUserByEmail(email: string): User | undefined;
@@ -118,6 +135,40 @@ export interface IStorage {
 }
 
 export class SQLiteStorage implements IStorage {
+  // ── Auth Tokens ────────────────────────────────────────────────────────────
+  createToken(userId: number, userRole: string): AuthToken {
+    const token = crypto.randomBytes(48).toString("hex");
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 8 * 60 * 60 * 1000); // 8 hours
+    return db.insert(authTokens).values({
+      token,
+      userId,
+      userRole,
+      expiresAt: expiresAt.toISOString(),
+      createdAt: now.toISOString(),
+    }).returning().get();
+  }
+
+  getToken(token: string): AuthToken | undefined {
+    const record = db.select().from(authTokens).where(eq(authTokens.token, token)).get();
+    if (!record) return undefined;
+    // Check expiry
+    if (new Date(record.expiresAt) < new Date()) {
+      this.deleteToken(token);
+      return undefined;
+    }
+    return record;
+  }
+
+  deleteToken(token: string): void {
+    db.delete(authTokens).where(eq(authTokens.token, token)).run();
+  }
+
+  cleanExpiredTokens(): void {
+    const now = new Date().toISOString();
+    sqlite.exec(`DELETE FROM auth_tokens WHERE expires_at < '${now}'`);
+  }
+
   // ── Users ──────────────────────────────────────────────────────────────────
   getUser(id: number): User | undefined {
     return db.select().from(users).where(eq(users.id, id)).get();

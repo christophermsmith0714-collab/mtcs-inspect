@@ -2,6 +2,27 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
 
+// ── Token storage (React state equivalent — module-level variable) ───────────
+// Stored here so queryClient.ts and store.tsx share the same token reference.
+// No localStorage/sessionStorage — those are blocked in sandboxed iframes.
+let _authToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  _authToken = token;
+}
+
+export function getAuthToken(): string | null {
+  return _authToken;
+}
+
+// ── Build headers with auth token ────────────────────────────────────────────
+function buildHeaders(hasBody: boolean): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (hasBody) headers["Content-Type"] = "application/json";
+  if (_authToken) headers["Authorization"] = `Bearer ${_authToken}`;
+  return headers;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -16,9 +37,8 @@ export async function apiRequest(
 ): Promise<Response> {
   const res = await fetch(`${API_BASE}${url}`, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: buildHeaders(data !== undefined),
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",  // ← REQUIRED: sends session cookie with every request
   });
 
   // Don't throw on auth errors — let callers handle them
@@ -35,7 +55,7 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const res = await fetch(`${API_BASE}${queryKey.join("/")}`, {
-      credentials: "include",  // ← REQUIRED: sends session cookie
+      headers: buildHeaders(false),
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

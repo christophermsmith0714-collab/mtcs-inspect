@@ -81,6 +81,17 @@ export const insertInspectionSchema = createInsertSchema(inspections)
 export type InsertInspection = z.infer<typeof insertInspectionSchema>;
 export type Inspection = typeof inspections.$inferSelect;
 
+// Auth tokens (replaces cookie sessions — works reliably on Railway HTTPS)
+export const authTokens = sqliteTable("auth_tokens", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  token: text("token").notNull().unique(),
+  userId: integer("user_id").notNull(),
+  userRole: text("user_role").notNull(),
+  expiresAt: text("expires_at").notNull(), // ISO string
+  createdAt: text("created_at").notNull(),
+});
+export type AuthToken = typeof authTokens.$inferSelect;
+
 // Inspection answers
 export const inspectionAnswers = sqliteTable("inspection_answers", {
   id: integer("id").primaryKey({ autoIncrement: true }),
