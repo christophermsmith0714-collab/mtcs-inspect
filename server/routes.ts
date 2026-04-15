@@ -3,7 +3,7 @@ import type { Express } from "express";
 import { type Server } from "http";
 import express from "express";
 import { Resend } from "resend";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { storage } from "./storage";
 import { insertInspectionSchema } from "@shared/schema";
 import { requireAuth, requireAdmin } from "./middleware";

@@ -1,6 +1,7 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+// Use zod/v4 — drizzle-zod@0.8.x uses zod v4 internally, so extend() requires v4 schemas
+import { z } from "zod/v4";
 
 // Users (clients)
 export const users = sqliteTable("users", {
