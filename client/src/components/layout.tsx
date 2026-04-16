@@ -100,7 +100,7 @@ export default function Layout({ children, title }: LayoutProps) {
       </div>
 
       {/* Mobile header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-card border-b border-border flex items-center px-4 gap-3">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b border-border mobile-header-safe flex items-center px-4 gap-3">
         <div className="w-7 h-7 rounded bg-primary flex items-center justify-center">
           <ClipboardCheck className="w-4 h-4 text-primary-foreground" />
         </div>
@@ -129,7 +129,7 @@ export default function Layout({ children, title }: LayoutProps) {
       )}
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto md:pt-0 pt-14">
+      <main className="flex-1 overflow-y-auto main-content-safe">
         {title && (
           <div className="px-6 py-5 border-b border-border bg-card/50">
             <h1 className="text-xl font-semibold">{title}</h1>

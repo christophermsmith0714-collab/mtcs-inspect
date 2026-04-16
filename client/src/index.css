@@ -126,3 +126,18 @@
   .print-break { page-break-before: always; }
   body { background: white; color: black; }
 }
+
+/* iOS safe-area support for mobile header/notch */
+.mobile-header-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+  height: auto;
+  min-height: calc(3.5rem + env(safe-area-inset-top, 0px));
+}
+.main-content-safe {
+  padding-top: calc(3.5rem + env(safe-area-inset-top, 0px));
+}
+@media (min-width: 768px) {
+  .main-content-safe {
+    padding-top: 0;
+  }
+}
