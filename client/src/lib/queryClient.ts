@@ -2,17 +2,41 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
 
-// ── Token storage (React state equivalent — module-level variable) ───────────
-// Stored here so queryClient.ts and store.tsx share the same token reference.
-// No localStorage/sessionStorage — those are blocked in sandboxed iframes.
-let _authToken: string | null = null;
+// ── Token storage ─────────────────────────────────────────────────────────────
+// Persisted to sessionStorage so a page reload doesn't log the user out.
+// sessionStorage is per-tab and cleared when the browser tab closes (safe).
+const TOKEN_KEY = "mtcs_auth_token";
+const USER_KEY  = "mtcs_auth_user";
+
+let _authToken: string | null = (() => {
+  try { return sessionStorage.getItem(TOKEN_KEY); } catch { return null; }
+})();
 
 export function setAuthToken(token: string | null) {
   _authToken = token;
+  try {
+    if (token) sessionStorage.setItem(TOKEN_KEY, token);
+    else        sessionStorage.removeItem(TOKEN_KEY);
+  } catch {}
 }
 
 export function getAuthToken(): string | null {
   return _authToken;
+}
+
+// Persist / restore the logged-in user object across reloads
+export function saveUserToSession(user: object | null) {
+  try {
+    if (user) sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+    else       sessionStorage.removeItem(USER_KEY);
+  } catch {}
+}
+
+export function loadUserFromSession(): any | null {
+  try {
+    const s = sessionStorage.getItem(USER_KEY);
+    return s ? JSON.parse(s) : null;
+  } catch { return null; }
 }
 
 // ── Build headers with auth token ────────────────────────────────────────────
@@ -54,7 +78,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(`${API_BASE}${queryKey.join("/")}`, {
+    const res = await fetch(`${API_BASE}${queryKey[0] as string}`, {
       headers: buildHeaders(false),
     });
 

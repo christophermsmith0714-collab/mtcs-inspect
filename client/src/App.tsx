@@ -7,6 +7,7 @@ import DashboardPage from "@/pages/dashboard";
 import InspectionFormPage from "@/pages/inspection-form";
 import InspectionDetailPage from "@/pages/inspection-detail";
 import AdminPage from "@/pages/admin";
+import { Loader2 } from "lucide-react";
 
 export type AppUser = {
   id: number;
@@ -18,7 +19,16 @@ export type AppUser = {
 };
 
 function AppRoutes() {
-  const { currentUser, logout } = useStore();
+  const { currentUser, authReady } = useStore();
+
+  // Still checking if the stored token is valid — don't flash login page
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return <LoginPage />;

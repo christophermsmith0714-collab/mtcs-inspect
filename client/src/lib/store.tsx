@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import { apiRequest, setAuthToken } from "./queryClient";
+import { apiRequest, setAuthToken, saveUserToSession, loadUserFromSession } from "./queryClient";
 import type { Answer } from "./data";
 
 export type User = {
@@ -30,6 +30,7 @@ export type Inspection = {
 type StoreType = {
   // Auth
   currentUser: User | null;
+  authReady: boolean;         // true once we've attempted to restore session
   login: (email: string, password: string) => Promise<User | null>;
   logout: () => Promise<void>;
 
@@ -50,9 +51,45 @@ type StoreType = {
 const Store = createContext<StoreType>(null!);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // Restore user from sessionStorage immediately — no flicker to login page
+  const [currentUser, setCurrentUser] = useState<User | null>(() => loadUserFromSession());
+  const [authReady, setAuthReady] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [inspections, setInspections] = useState<Inspection[]>([]);
+
+  // On mount: verify the stored token is still valid with the server
+  useEffect(() => {
+    const storedUser = loadUserFromSession();
+    if (!storedUser) {
+      setAuthReady(true);
+      return;
+    }
+    // Ping /api/auth/me to confirm token still valid (8-hour expiry)
+    apiRequest("GET", "/api/auth/me")
+      .then(async res => {
+        if (res.ok) {
+          const user = await res.json();
+          // Normalize assignedTemplates
+          const normalized = {
+            ...user,
+            assignedTemplates: typeof user.assignedTemplates === "string"
+              ? JSON.parse(user.assignedTemplates || "[]")
+              : (user.assignedTemplates ?? []),
+          };
+          setCurrentUser(normalized);
+          saveUserToSession(normalized);
+        } else {
+          // Token expired — clear everything
+          setAuthToken(null);
+          saveUserToSession(null);
+          setCurrentUser(null);
+        }
+      })
+      .catch(() => {
+        // Network error — keep user logged in optimistically, will fail on next API call
+      })
+      .finally(() => setAuthReady(true));
+  }, []);
 
   const login = async (email: string, password: string): Promise<User | null> => {
     const res = await apiRequest("POST", "/api/auth/login", { email, password });
@@ -61,42 +98,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       throw new Error(err.error || "Invalid credentials");
     }
     const { user, token } = await res.json();
-    // Store token in module-level variable — sent as Authorization: Bearer header
+    const normalized = {
+      ...user,
+      assignedTemplates: typeof user.assignedTemplates === "string"
+        ? JSON.parse(user.assignedTemplates || "[]")
+        : (user.assignedTemplates ?? []),
+    };
     setAuthToken(token);
-    setCurrentUser(user);
-    return user;
+    saveUserToSession(normalized);
+    setCurrentUser(normalized);
+    return normalized;
   };
 
   const logout = async () => {
     try { await apiRequest("POST", "/api/auth/logout"); } catch {}
-    setAuthToken(null);  // Clear the Bearer token
+    setAuthToken(null);
+    saveUserToSession(null);
     setCurrentUser(null);
     setInspections([]);
   };
 
-  // Auto-logout if session expires (401 from any API call)
-  const handleUnauthorized = () => {
-    setCurrentUser(null);
-    setInspections([]);
-  };
-
-  // Load inspections from DB
+  // Load inspections from DB — single batch endpoint, no N+1
   const loadInspections = async () => {
     if (!currentUser) return;
     try {
-      // Role is determined server-side from session — no params needed
-      const res = await apiRequest("GET", `/api/inspections`);
+      const res = await apiRequest("GET", "/api/inspections?includeAnswers=true");
       if (!res.ok) return;
       const data: any[] = await res.json();
-      // For each inspection, load its answers
-      const withAnswers = await Promise.all(data.map(async insp => {
-        try {
-          const ar = await apiRequest("GET", `/api/inspections/${insp.id}/answers`);
-          const answers: Answer[] = ar.ok ? await ar.json() : [];
-          return { ...insp, answers };
-        } catch {
-          return { ...insp, answers: [] };
-        }
+      const withAnswers = data.map(insp => ({
+        ...insp,
+        answers: Array.isArray(insp.answers) ? insp.answers : [],
+        assignedTemplates: typeof insp.assignedTemplates === "string"
+          ? JSON.parse(insp.assignedTemplates || "[]")
+          : (insp.assignedTemplates ?? []),
       }));
       setInspections(withAnswers);
     } catch (e) {
@@ -140,7 +174,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   return (
     <Store.Provider value={{
-      currentUser, login, logout,
+      currentUser, authReady, login, logout,
       users, setUsers,
       inspections, loadInspections, addInspection, updateInspection, saveAnswers, deleteInspection, getInspection,
     }}>

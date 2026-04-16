@@ -274,10 +274,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ═══════════════════════════════════════════════════════════════════════════
 
   app.get("/api/inspections", requireAuth, (req, res) => {
-    if (req.authUserRole === "admin") {
-      return res.json(storage.getAllInspections());
-    }
-    return res.json(storage.getInspections(req.authUserId!));
+    const includeAnswers = req.query.includeAnswers === "true";
+    const raw = req.authUserRole === "admin"
+      ? storage.getAllInspections()
+      : storage.getInspections(req.authUserId!);
+
+    if (!includeAnswers) return res.json(raw);
+
+    // Batch-load all answers for all inspections — no N+1
+    const withAnswers = raw.map(insp => {
+      const rawAnswers = storage.getAnswersByInspection(insp.id);
+      const answers = rawAnswers.map(a => ({
+        ...a,
+        photos: (() => { try { return JSON.parse(a.photoUrls || "[]"); } catch { return []; } })(),
+      }));
+      return { ...insp, answers };
+    });
+    return res.json(withAnswers);
   });
 
   app.get("/api/inspections/:id", requireAuth, (req, res) => {

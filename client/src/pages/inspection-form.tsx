@@ -25,7 +25,7 @@ export default function InspectionFormPage({
 }) {
   const [, navigate] = useHashLocation();
   const { toast } = useToast();
-  const { currentUser, addInspection, updateInspection, saveAnswers, getInspection } = useStore();
+  const { currentUser, authReady, addInspection, updateInspection, saveAnswers, getInspection } = useStore();
 
   // Load existing if editing
   const existing = inspectionId ? getInspection(inspectionId) : null;
@@ -226,8 +226,8 @@ export default function InspectionFormPage({
 
   // ── Loading / error states ──────────────────────────────────────────────────────
 
-  // Wait for auth + questions
-  if (!currentUser || questionsLoading) {
+  // Wait for auth restore (sessionStorage) + token validation + questions fetch
+  if (!authReady || !currentUser || questionsLoading) {
     return (
       <Layout title="Loading...">
         <div className="flex items-center justify-center py-20">
