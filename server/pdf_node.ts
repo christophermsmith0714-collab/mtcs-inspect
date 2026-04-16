@@ -133,22 +133,24 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     doc.y = 100;
     fillColor(doc, TEXT);
 
-    // Date and contact
-    doc.fontSize(10).font("Helvetica").text(now, { align: "right" });
-    doc.moveDown(0.5);
-
-    // Recipient
-    if (data.sendToEmail) {
-      doc.font("Helvetica").text(data.sendToEmail);
-      doc.moveDown(0.5);
-    }
-
-    doc.moveDown(0.5);
-
-    // Subject line
-    doc.font("Helvetica-Bold").fontSize(11).text(`RE: ${data.templateName} — ${data.facility}`);
+    // Company name, date, inspector block
+    doc.fontSize(14).font("Helvetica-Bold").text(data.facility, { align: "left" });
     doc.moveDown(0.3);
-    doc.font("Helvetica").fontSize(10).text(`Inspection Date: ${formattedDate} | Inspector: ${data.inspector}`);
+    doc.fontSize(10).font("Helvetica").text(`Date: ${formattedDate}`, { align: "left" });
+    doc.fontSize(10).font("Helvetica").text(`Inspector: ${data.inspector}`, { align: "left" });
+    doc.moveDown(1);
+
+    // Report description sentence
+    const isSPCC = data.templateType === "spcc";
+    const cfr = isSPCC ? "40 CFR Part 112" : "40 CFR Part 122 / MSGP";
+    const regulation = isSPCC
+      ? "Spill Prevention, Control, and Countermeasure (SPCC)"
+      : "Municipal Separate Storm Sewer System (MS4) / SWPPP";
+
+    doc.fontSize(10).font("Helvetica").text(
+      `This report documents the results of the ${data.templateName} inspection conducted on ${formattedDate}.`,
+      { align: "justify" }
+    );
     doc.moveDown(1);
 
     // Salutation
@@ -156,12 +158,6 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     doc.moveDown(0.8);
 
     // Body
-    const isSPCC = data.templateType === "spcc";
-    const cfr = isSPCC ? "40 CFR Part 112" : "40 CFR Part 122 / MSGP";
-    const regulation = isSPCC
-      ? "Spill Prevention, Control, and Countermeasure (SPCC)"
-      : "Municipal Separate Storm Sewer System (MS4) / SWPPP";
-
     doc.text(
       `Please find enclosed the completed ${regulation} inspection report for ${data.facility}, conducted on ${formattedDate} by ${data.inspector}. This inspection was performed in accordance with ${cfr} requirements.`,
       { align: "justify" }
@@ -172,7 +168,6 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     const yesCount = data.answers.filter(a => a.answer === "yes").length;
     const noCount = data.answers.filter(a => a.answer === "no").length;
     const naCount = data.answers.filter(a => a.answer === "n/a").length;
-    const compliancePct = totalQ > 0 ? Math.round(((yesCount + naCount) / totalQ) * 100) : 0;
 
     doc.text(
       `The inspection covered ${totalQ} compliance checklist items. Of those, ${yesCount} were found to be in compliance (YES), ${naCount} were not applicable (N/A), and ${noCount} were identified as deficiencies requiring corrective action (NO).`,
@@ -204,18 +199,6 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     doc.font("Helvetica-Bold").text("Midwest Training and Consulting Services");
     doc.font("Helvetica").text(data.mtcsContact || "info@midwest-training.com");
     doc.text("midwest-training.com");
-
-    // Summary box
-    doc.moveDown(1);
-    const boxY = doc.y;
-    doc.rect(50, boxY, 512, 70).fill(hexToRgb(GREEN_LIGHT)).stroke(hexToRgb(GRAY_MID));
-    fillColor(doc, TEXT);
-    doc.fontSize(9).font("Helvetica-Bold").text("INSPECTION SUMMARY", 62, boxY + 8);
-    doc.font("Helvetica").fontSize(9);
-    doc.text(`Facility: ${data.facility}`, 62, boxY + 22);
-    doc.text(`Inspector: ${data.inspector}   |   Date: ${formattedDate}`, 62, boxY + 34);
-    doc.text(`Compliance: ${compliancePct}%   |   Deficiencies: ${noCount} of ${totalQ} items`, 62, boxY + 46);
-    doc.text(`Template: ${data.templateName}`, 62, boxY + 58);
 
     // ── PAGE 2+: Inspection Report ────────────────────────────────────────────
     doc.addPage();
@@ -341,47 +324,20 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
         if (doc.y > 680) doc.addPage();
 
         const rec = CFR_RECOMMENDATIONS[q.id];
-        const isCritical = rec?.severity === "critical";
-        const bgColor = isCritical ? GOLD_LIGHT : BLUE_LIGHT;
-        const borderColor = isCritical ? GOLD : BLUE;
-        const labelColor = isCritical ? GOLD : BLUE;
-        const deadline = isCritical ? "24–48 Hours" : "30 Days";
-
-        const startY = doc.y;
-        // We'll draw the box after we know the height
-        fillColor(doc, TEXT);
-
-        // Severity badge
-        const badgeColor = isCritical ? GOLD : BLUE;
-        doc.rect(50, startY, 70, 14).fill(hexToRgb(badgeColor));
-        fillColor(doc, "#ffffff");
-        doc.fontSize(7).font("Helvetica-Bold").text(
-          isCritical ? "CRITICAL" : "STANDARD",
-          50, startY + 3, { width: 70, align: "center" }
-        );
-
-        // Deadline badge
-        doc.rect(126, startY, 80, 14).fill(hexToRgb(borderColor));
-        fillColor(doc, "#ffffff");
-        doc.fontSize(7).font("Helvetica-Bold").text(
-          `Deadline: ${deadline}`,
-          126, startY + 3, { width: 80, align: "center" }
-        );
 
         // CFR reference
         if (rec?.cfr) {
           fillColor(doc, GRAY);
-          doc.fontSize(7).font("Helvetica").text(rec.cfr, 214, startY + 3, { width: 300 });
+          doc.fontSize(7).font("Helvetica").text(rec.cfr, 50, doc.y, { width: 512 });
+          doc.moveDown(0.3);
         }
 
-        doc.y = startY + 18;
-
-        // Question
+        // Question / Finding
         fillColor(doc, TEXT);
         doc.fontSize(9).font("Helvetica-Bold").text(`Finding: ${q.questionText}`, 50, doc.y, { width: 512 });
         doc.moveDown(0.3);
 
-        // Recommendation
+        // Recommendation text
         fillColor(doc, TEXT);
         doc.fontSize(9).font("Helvetica").text(
           rec?.recommendation || "Review applicable CFR requirements and implement corrective action within 30 days.",
