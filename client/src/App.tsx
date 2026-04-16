@@ -7,6 +7,8 @@ import DashboardPage from "@/pages/dashboard";
 import InspectionFormPage from "@/pages/inspection-form";
 import InspectionDetailPage from "@/pages/inspection-detail";
 import AdminPage from "@/pages/admin";
+import ChecklistsPage from "@/pages/checklists";
+import ChecklistBuilderPage from "@/pages/checklist-builder";
 import { Loader2 } from "lucide-react";
 
 export type AppUser = {
@@ -48,6 +50,10 @@ function AppRoutes() {
         <InspectionDetailPage inspectionId={parseInt(params.id)} />
       )} />
       <Route path="/admin" component={() => <AdminPage />} />
+      <Route path="/checklists" component={() => <ChecklistsPage />} />
+      <Route path="/checklists/:id" component={({ params }) => (
+        <ChecklistBuilderPage templateId={parseInt(params.id)} />
+      )} />
       <Route component={() => <DashboardPage />} />
     </Switch>
   );

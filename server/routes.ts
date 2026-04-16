@@ -269,6 +269,85 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(storage.getQuestionsByTemplate(id));
   });
 
+  // POST /api/templates — admin creates a new checklist
+  app.post("/api/templates", requireAuth, requireAdmin, (req, res) => {
+    const { name, type, description } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: "Name is required" });
+    const tmpl = storage.createTemplate({
+      name: String(name).trim().substring(0, 200),
+      type: String(type || "custom").substring(0, 50),
+      description: description ? String(description).trim().substring(0, 500) : "",
+    });
+    res.status(201).json(tmpl);
+  });
+
+  // PATCH /api/templates/:id — admin updates template
+  app.patch("/api/templates/:id", requireAuth, requireAdmin, (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid template ID" });
+    const { name, type, description } = req.body;
+    const updates: any = {};
+    if (name !== undefined) updates.name = String(name).trim().substring(0, 200);
+    if (type !== undefined) updates.type = String(type).substring(0, 50);
+    if (description !== undefined) updates.description = String(description).trim().substring(0, 500);
+    const tmpl = storage.updateTemplate(id, updates);
+    if (!tmpl) return res.status(404).json({ error: "Template not found" });
+    res.json(tmpl);
+  });
+
+  // DELETE /api/templates/:id — admin deletes template and all its questions
+  app.delete("/api/templates/:id", requireAuth, requireAdmin, (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid template ID" });
+    storage.deleteQuestionsByTemplate(id);
+    storage.deleteTemplate(id);
+    res.json({ success: true });
+  });
+
+  // POST /api/templates/:id/questions — admin adds a question
+  app.post("/api/templates/:id/questions", requireAuth, requireAdmin, (req, res) => {
+    const templateId = parseInt(req.params.id);
+    if (isNaN(templateId)) return res.status(400).json({ error: "Invalid template ID" });
+    const { section, questionText, recommendResponse, order } = req.body;
+    if (!section?.trim() || !questionText?.trim()) {
+      return res.status(400).json({ error: "Section and question text are required" });
+    }
+    const existing = storage.getQuestionsByTemplate(templateId);
+    const nextOrder = order !== undefined ? Number(order) : (existing.length > 0 ? Math.max(...existing.map((q: any) => q.order)) + 1 : 1);
+    const q = storage.createQuestion({
+      templateId,
+      section: String(section).trim().substring(0, 200),
+      questionText: String(questionText).trim().substring(0, 1000),
+      recommendResponse: recommendResponse ? String(recommendResponse).trim().substring(0, 2000) : "",
+      order: nextOrder,
+      required: true,
+    });
+    res.status(201).json(q);
+  });
+
+  // PATCH /api/questions/:id — admin edits a question
+  app.patch("/api/questions/:id", requireAuth, requireAdmin, (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid question ID" });
+    const { section, questionText, recommendResponse, order } = req.body;
+    const updates: any = {};
+    if (section !== undefined) updates.section = String(section).trim().substring(0, 200);
+    if (questionText !== undefined) updates.questionText = String(questionText).trim().substring(0, 1000);
+    if (recommendResponse !== undefined) updates.recommendResponse = String(recommendResponse).trim().substring(0, 2000);
+    if (order !== undefined) updates.order = Number(order);
+    const q = storage.updateQuestion(id, updates);
+    if (!q) return res.status(404).json({ error: "Question not found" });
+    res.json(q);
+  });
+
+  // DELETE /api/questions/:id — admin removes a question
+  app.delete("/api/questions/:id", requireAuth, requireAdmin, (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid question ID" });
+    storage.deleteQuestion(id);
+    res.json({ success: true });
+  });
+
   // ═══════════════════════════════════════════════════════════════════════════
   // INSPECTIONS — authenticated, ownership enforced
   // ═══════════════════════════════════════════════════════════════════════════

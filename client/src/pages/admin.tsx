@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useStore, type User } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
-import { getTemplates } from "@/lib/data";
 import { apiRequest } from "@/lib/queryClient";
 import { ClipboardCheck, Users, Plus, Pencil, UserX, UserCheck, Loader2 } from "lucide-react";
 
@@ -24,10 +23,9 @@ type ClientForm = {
 const emptyForm = (): ClientForm => ({ name: "", email: "", password: "", company: "", assignedTemplates: [] });
 
 export default function AdminPage() {
-  const { currentUser, users, setUsers, inspections } = useStore();
+  const { currentUser, users, setUsers, inspections, templates, loadTemplates } = useStore();
   const [, navigate] = useHashLocation();
   const { toast } = useToast();
-  const templates = getTemplates();
 
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -37,19 +35,22 @@ export default function AdminPage() {
 
   const fetchClients = () => {
     setLoading(true);
-    apiRequest("GET", "/api/users")
-      .then(r => r.json())
-      .then((data: User[]) => {
-        const parsed = data.map((u: any) => ({
+    // Fetch clients and templates in parallel
+    Promise.all([
+      apiRequest("GET", "/api/users").then(r => r.json()),
+      loadTemplates(),
+    ])
+      .then(([data]) => {
+        const parsed = (data as any[]).map((u: any) => ({
           ...u,
           assignedTemplates: typeof u.assignedTemplates === "string"
             ? JSON.parse(u.assignedTemplates || "[]")
             : (u.assignedTemplates ?? []),
         }));
         setUsers(parsed);
-        setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(err => console.error("Failed to load clients:", err))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {

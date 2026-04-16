@@ -120,9 +120,17 @@ export interface IStorage {
   // Templates
   getTemplates(): InspectionTemplate[];
   getTemplate(id: number): InspectionTemplate | undefined;
+  createTemplate(data: InsertTemplate): InspectionTemplate;
+  updateTemplate(id: number, data: Partial<InsertTemplate>): InspectionTemplate | undefined;
+  deleteTemplate(id: number): void;
+  replaceQuestions(templateId: number, questions: InsertQuestion[]): InspectionQuestion[];
 
   // Questions
   getQuestionsByTemplate(templateId: number): InspectionQuestion[];
+  createQuestion(data: InsertQuestion): InspectionQuestion;
+  updateQuestion(id: number, data: Partial<InsertQuestion>): InspectionQuestion | undefined;
+  deleteQuestion(id: number): void;
+  deleteQuestionsByTemplate(templateId: number): void;
 
   // Inspections
   getInspections(userId: number): Inspection[];
@@ -217,10 +225,43 @@ export class SQLiteStorage implements IStorage {
     return db.select().from(inspectionTemplates).where(eq(inspectionTemplates.id, id)).get();
   }
 
+  createTemplate(data: InsertTemplate): InspectionTemplate {
+    return db.insert(inspectionTemplates).values(data).returning().get();
+  }
+
+  updateTemplate(id: number, data: Partial<InsertTemplate>): InspectionTemplate | undefined {
+    return db.update(inspectionTemplates).set(data).where(eq(inspectionTemplates.id, id)).returning().get();
+  }
+
+  deleteTemplate(id: number): void {
+    db.delete(inspectionTemplates).where(eq(inspectionTemplates.id, id)).run();
+  }
+
+  replaceQuestions(templateId: number, questions: InsertQuestion[]): InspectionQuestion[] {
+    db.delete(inspectionQuestions).where(eq(inspectionQuestions.templateId, templateId)).run();
+    return questions.map(q => db.insert(inspectionQuestions).values(q).returning().get());
+  }
+
   // ── Questions ──────────────────────────────────────────────────────────────
   getQuestionsByTemplate(templateId: number): InspectionQuestion[] {
     return db.select().from(inspectionQuestions)
       .where(eq(inspectionQuestions.templateId, templateId)).all();
+  }
+
+  createQuestion(data: InsertQuestion): InspectionQuestion {
+    return db.insert(inspectionQuestions).values(data).returning().get();
+  }
+
+  updateQuestion(id: number, data: Partial<InsertQuestion>): InspectionQuestion | undefined {
+    return db.update(inspectionQuestions).set(data).where(eq(inspectionQuestions.id, id)).returning().get();
+  }
+
+  deleteQuestion(id: number): void {
+    db.delete(inspectionQuestions).where(eq(inspectionQuestions.id, id)).run();
+  }
+
+  deleteQuestionsByTemplate(templateId: number): void {
+    db.delete(inspectionQuestions).where(eq(inspectionQuestions.templateId, templateId)).run();
   }
 
   // ── Inspections ────────────────────────────────────────────────────────────

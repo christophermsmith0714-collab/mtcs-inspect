@@ -14,7 +14,7 @@ export type User = {
 export type Template = {
   id: number;
   name: string;
-  type: "spcc" | "stormwater";
+  type: string;
   description: string;
 };
 
@@ -49,29 +49,22 @@ export type Inspection = {
   answers: Answer[];
 };
 
-// ─── Static template list (templates don't change) ──────────────────────────
-export const TEMPLATES: Template[] = [
-  {
-    id: 1,
-    name: "SPCC Monthly Inspection",
-    type: "spcc",
-    description: "40 CFR Part 112 compliant monthly facility inspection",
-  },
-  {
-    id: 2,
-    name: "Stormwater Monthly Inspection",
-    type: "stormwater",
-    description: "MSGP / SWPPP monthly inspection documentation",
-  },
-];
+// ─── Templates are loaded from API — this cache is populated after login ──────
+// Components should use useTemplates() hook (see store.tsx) instead of these.
+// These are kept as fallbacks for components that haven't been migrated yet.
+let _templateCache: Template[] = [];
+
+export function setTemplateCache(templates: Template[]) {
+  _templateCache = templates;
+}
 
 export function getTemplate(id: number): Template | undefined {
-  return TEMPLATES.find(t => t.id === id);
+  return _templateCache.find(t => t.id === id);
 }
 
 export function getTemplates(): Template[] {
-  return TEMPLATES;
+  return _templateCache;
 }
 
 // ─── Questions are loaded from the API — no hardcoded list ──────────────────
-// Use the useQuestions() hook in components instead of getQuestions()
+// Use useQuery with /api/templates/:id/questions in components

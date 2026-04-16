@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { apiRequest, setAuthToken, saveUserToSession, loadUserFromSession } from "./queryClient";
-import type { Answer } from "./data";
+import { setTemplateCache, type Answer, type Template } from "./data";
 
 export type User = {
   id: number;
@@ -34,6 +34,10 @@ type StoreType = {
   login: (email: string, password: string) => Promise<User | null>;
   logout: () => Promise<void>;
 
+  // Templates (from DB)
+  templates: Template[];
+  loadTemplates: () => Promise<void>;
+
   // Users (admin)
   users: User[];
   setUsers: (users: User[]) => void;
@@ -54,6 +58,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Restore user from sessionStorage immediately — no flicker to login page
   const [currentUser, setCurrentUser] = useState<User | null>(() => loadUserFromSession());
   const [authReady, setAuthReady] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [inspections, setInspections] = useState<Inspection[]>([]);
 
@@ -91,6 +96,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .finally(() => setAuthReady(true));
   }, []);
 
+  // Load templates from DB and populate the cache used by data.ts
+  const loadTemplates = async () => {
+    try {
+      const res = await apiRequest("GET", "/api/templates");
+      if (!res.ok) return;
+      const data: Template[] = await res.json();
+      setTemplates(data);
+      setTemplateCache(data);
+    } catch (e) {
+      console.error("Failed to load templates:", e);
+    }
+  };
+
   const login = async (email: string, password: string): Promise<User | null> => {
     const res = await apiRequest("POST", "/api/auth/login", { email, password });
     if (!res.ok) {
@@ -116,6 +134,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     saveUserToSession(null);
     setCurrentUser(null);
     setInspections([]);
+    setTemplates([]);
+    setTemplateCache([]);
   };
 
   // Load inspections from DB — single batch endpoint, no N+1
@@ -138,9 +158,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Load inspections whenever currentUser changes
+  // Load templates + inspections whenever currentUser changes
   useEffect(() => {
-    if (currentUser) loadInspections();
+    if (currentUser) {
+      loadTemplates();
+      loadInspections();
+    }
   }, [currentUser?.id]);
 
   const addInspection = async (data: Omit<Inspection, "id" | "createdAt" | "answers">): Promise<Inspection> => {
@@ -175,6 +198,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   return (
     <Store.Provider value={{
       currentUser, authReady, login, logout,
+      templates, loadTemplates,
       users, setUsers,
       inspections, loadInspections, addInspection, updateInspection, saveAnswers, deleteInspection, getInspection,
     }}>

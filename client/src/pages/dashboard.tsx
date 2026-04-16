@@ -5,21 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
-import { getTemplates, getTemplate } from "@/lib/data";
+import { getTemplate } from "@/lib/data";
 import { ClipboardCheck, Droplets, ShieldCheck, ChevronRight, Calendar, Trash2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function DashboardPage() {
-  const { currentUser, inspections, deleteInspection } = useStore();
+  const { currentUser, inspections, deleteInspection, templates } = useStore();
   const { toast } = useToast();
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   if (!currentUser) return null;
 
-  const allTemplates = getTemplates();
   const visibleTemplates = currentUser.role === "admin"
-    ? allTemplates
-    : allTemplates.filter(t => (currentUser.assignedTemplates ?? []).includes(t.id));
+    ? templates
+    : templates.filter(t => (currentUser.assignedTemplates ?? []).includes(t.id));
 
   const myInspections = currentUser.role === "admin"
     ? inspections

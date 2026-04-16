@@ -3,7 +3,7 @@ import { useHashLocation } from "wouter/use-hash-location";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
-import { LayoutDashboard, ClipboardCheck, LogOut, Users, Menu, X, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, LogOut, Users, Menu, X, ClipboardList } from "lucide-react";
 import { useState } from "react";
 
 interface LayoutProps {
@@ -20,7 +20,10 @@ export default function Layout({ children, title }: LayoutProps) {
 
   const nav = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    ...(currentUser.role === "admin" ? [{ href: "/admin", label: "Clients", icon: Users }] : []),
+    ...(currentUser.role === "admin" ? [
+      { href: "/admin",       label: "Clients",    icon: Users },
+      { href: "/checklists",  label: "Checklists", icon: ClipboardList },
+    ] : []),
   ];
 
   const SidebarContent = () => (
@@ -54,7 +57,7 @@ export default function Layout({ children, title }: LayoutProps) {
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1">
         {nav.map(({ href, label, icon: Icon }) => {
-          const active = location === href || location === "/" && href === "/dashboard";
+          const active = location === href || (location === "/" && href === "/dashboard") || (href !== "/dashboard" && location.startsWith(href));
           return (
             <Link key={href} href={href}>
               <a onClick={() => setMobileOpen(false)}
