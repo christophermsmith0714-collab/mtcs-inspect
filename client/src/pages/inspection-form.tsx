@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useStore } from "@/lib/store";
 import { getTemplate, type Answer, type Question } from "@/lib/data";
 import { Camera, X, CheckCircle, ChevronDown, ChevronUp, Send, Save, ArrowLeft, Mail, FileDown, Loader2 } from "lucide-react";
-import { apiRequest, getQueryFn } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 
 type AnswerState = { answer: "yes" | "no" | "n/a" | ""; comments: string; photos: string[] };
 
@@ -32,13 +32,17 @@ export default function InspectionFormPage({
   const resolvedTemplateId = templateId ?? existing?.templateId ?? 1;
   const template = getTemplate(resolvedTemplateId);
 
-  // Fetch questions from API — only once logged in (token is available)
+  // Fetch questions from API — wait for authReady so token is guaranteed set
   const { data: questions = [], isLoading: questionsLoading, error: questionsError } = useQuery<Question[]>({
     queryKey: [`/api/templates/${resolvedTemplateId}/questions`],
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/templates/${resolvedTemplateId}/questions`);
+      if (!res.ok) throw new Error(`${res.status}`);
+      return res.json();
+    },
     staleTime: 0,
-    retry: 2,
-    enabled: !!currentUser,
+    retry: 1,
+    enabled: !!currentUser && authReady,
   });
   const sections = [...new Set(questions.map((q: Question) => q.section))];
 
@@ -238,7 +242,8 @@ export default function InspectionFormPage({
     );
   }
 
-  if (questionsError || questions.length === 0) {
+  // Only show the empty/error state after loading has fully finished (not during)
+  if (!questionsLoading && (questionsError || questions.length === 0)) {
     return (
       <Layout title="Error">
         <div className="flex flex-col items-center justify-center py-20 gap-4">

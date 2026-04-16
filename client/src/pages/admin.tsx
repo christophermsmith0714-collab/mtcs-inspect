@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useHashLocation } from "wouter/use-hash-location";
 import Layout from "@/components/layout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,7 +23,7 @@ type ClientForm = {
 const emptyForm = (): ClientForm => ({ name: "", email: "", password: "", company: "", assignedTemplates: [] });
 
 export default function AdminPage() {
-  const { currentUser, users, setUsers, inspections, templates, loadTemplates } = useStore();
+  const { currentUser, authReady, users, setUsers, inspections, templates, loadTemplates } = useStore();
   const [, navigate] = useHashLocation();
   const { toast } = useToast();
 
@@ -33,15 +33,12 @@ export default function AdminPage() {
   const [form, setForm] = useState<ClientForm>(emptyForm());
   const [saving, setSaving] = useState(false);
 
-  const fetchClients = () => {
+  const fetchClients = useCallback(() => {
     setLoading(true);
-    // Fetch clients and templates in parallel
-    Promise.all([
-      apiRequest("GET", "/api/users").then(r => r.json()),
-      loadTemplates(),
-    ])
-      .then(([data]) => {
-        const parsed = (data as any[]).map((u: any) => ({
+    apiRequest("GET", "/api/users")
+      .then(r => r.json())
+      .then((data: any[]) => {
+        const parsed = data.map((u: any) => ({
           ...u,
           assignedTemplates: typeof u.assignedTemplates === "string"
             ? JSON.parse(u.assignedTemplates || "[]")
@@ -51,11 +48,16 @@ export default function AdminPage() {
       })
       .catch(err => console.error("Failed to load clients:", err))
       .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    if (currentUser?.role === "admin") fetchClients();
   }, []);
+
+  // Wait for auth to be confirmed before fetching — avoids stuck spinner
+  useEffect(() => {
+    if (authReady && currentUser?.role === "admin") {
+      fetchClients();
+    } else if (authReady && currentUser?.role !== "admin") {
+      setLoading(false);
+    }
+  }, [authReady, currentUser?.id]);
 
   if (currentUser?.role !== "admin") {
     navigate("/dashboard");

@@ -80,7 +80,7 @@ export default function Layout({ children, title }: LayoutProps) {
             {currentUser.subscriptionStatus === "active" ? "Active" : "Inactive"}
           </span>
         </div>
-        {currentUser.subscriptionStatus === "active" && <div className="text-muted-foreground mt-0.5">$15/month</div>}
+
       </div>
 
       {/* Logout */}
