@@ -55,6 +55,7 @@ sqlite.exec(`
     template_id INTEGER NOT NULL,
     section TEXT NOT NULL,
     question_text TEXT NOT NULL,
+    recommend_response TEXT DEFAULT '',
     "order" INTEGER NOT NULL DEFAULT 0,
     required INTEGER NOT NULL DEFAULT 1
   );
@@ -92,10 +93,13 @@ sqlite.exec(`
   );
 `);
 
-// Safe migration: add assigned_templates if missing
+// Safe migrations — add columns if missing
 try {
   sqlite.exec(`ALTER TABLE users ADD COLUMN assigned_templates TEXT NOT NULL DEFAULT '[]'`);
-} catch (_) { /* column already exists */ }
+} catch (_) { /* already exists */ }
+try {
+  sqlite.exec(`ALTER TABLE inspection_questions ADD COLUMN recommend_response TEXT DEFAULT ''`);
+} catch (_) { /* already exists */ }
 
 // ── Storage Interface ────────────────────────────────────────────────────────
 export interface IStorage {
@@ -270,10 +274,121 @@ export class SQLiteStorage implements IStorage {
 
 export const storage = new SQLiteStorage();
 
+// ── Re-seed SPCC questions (replaces old questions with CFR-based checklist) ──
+function reseedSPCC() {
+  const templates = storage.getTemplates();
+  const spccTemplate = templates.find(t => t.type === "spcc");
+  if (!spccTemplate) return; // will be created during full seed
+
+  // Check if already on new question set (>17 questions means updated)
+  const existing = storage.getQuestionsByTemplate(spccTemplate.id);
+  if (existing.length > 17) return; // already updated
+
+  // Wipe old SPCC questions and replace with CFR-based set
+  db.delete(inspectionQuestions).where(eq(inspectionQuestions.templateId, spccTemplate.id)).run();
+
+  const newQuestions = getSPCCQuestions(spccTemplate.id);
+  for (const q of newQuestions) {
+    db.insert(inspectionQuestions).values({ ...q, required: true }).run();
+  }
+  console.log(`[seed] Replaced SPCC questions with ${newQuestions.length} CFR-based questions`);
+}
+
+function getSPCCQuestions(templateId: number) {
+  return [
+    { templateId, section: "Above Ground Containers", questionText: "Are the tanks on a regular schedule for inspections for integrity? 40 CFR 112.8(c)", recommendResponse: "Schedule tanks for integrity inspections [Reference CFR 40 CFR 112.8(c)]", order: 1 },
+    { templateId, section: "Above Ground Containers", questionText: "Are inspections documented? 40 CFR 112.8(c)", recommendResponse: "Maintain inspections documents [Reference CFR 40 CFR 112.8(c)]", order: 2 },
+    { templateId, section: "Above Ground Containers", questionText: "Are comparison records of aboveground container integrity testing are maintained? 40 CFR 112.8(c)", recommendResponse: "Obtain comparison records of aboveground container integrity testing [Reference CFR 40 CFR 112.8(c)]", order: 3 },
+    { templateId, section: "Bulk Storage Containers", questionText: "Area atop and around tank free of combustible materials, debris and stains?", recommendResponse: "Tanks need to be free of combustible materials and free of debris to prevent accidental ignition of the tanks. Stains should also be removed to prevent rust and show that there is not a continuing leak.", order: 4 },
+    { templateId, section: "Bulk Storage Containers", questionText: "The ground and/or concrete around tank is free of oil?", recommendResponse: "Tanks need to be free of mechanical defects on the piping, joints, fill ports, etc. If there is noticeable oil on the ground, it is required that the source of that oil be found and addressed.", order: 5 },
+    { templateId, section: "Bulk Storage Containers", questionText: "Container supports are free of dents, cracks or shifting?", recommendResponse: "If tank supports show signs of wear, cracks, visible dents, or if the tank is made to be unstable, the tank needs to be taken out of service immediately and the supports need to be addressed.", order: 6 },
+    { templateId, section: "Bulk Storage Containers", questionText: "Is the fluid gauge working properly / tested periodically?", recommendResponse: "Tank fluid gauges need to be functional and tested periodically. Fluid gauges that are not working need to be replaced immediately.", order: 7 },
+    { templateId, section: "Bulk Storage Containers", questionText: "Are Containers free of drip marks? 40 CFR 112.8(c)", recommendResponse: "Investigate reason for container drip marks [Reference CFR 40 CFR 112.8(c)]", order: 8 },
+    { templateId, section: "Bulk Storage Containers", questionText: "Are containers free of discoloration of containers? 40 CFR 112.8(c)", recommendResponse: "Investigate reason for container discoloration [Reference CFR 40 CFR 112.8(c)]", order: 9 },
+    { templateId, section: "Bulk Storage Containers", questionText: "Are containers free of puddles, spilled or leaked materials? 40 CFR 112.8(c)", recommendResponse: "Repair or replace leaking containers [Reference CFR 40 CFR 112.8(c)]", order: 10 },
+    { templateId, section: "Bulk Storage Containers", questionText: "Tank is free from visible cracks or corrosion on tank, fittings, joints or seals? 40 CFR 112.8(c)", recommendResponse: "Tanks need to be free of cracks, corrosion, or visible defects on the tanks, fittings, joints, and seals. If cracks are found on the tank, the tank needs to be pulled immediately from service and a spill prevention plan must be in place [Reference CFR 40 CFR 112.8(c)]", order: 11 },
+    { templateId, section: "Bulk Storage Containers", questionText: "Are containers free of raised spots, dents or cracks? 40 CFR 112.8(c)", recommendResponse: "Tanks need to be free of raised spots, dents, and cracks. If any of these are present, then an inspection of the tank and its integrity need to be performed immediately. [Reference CFR 40 CFR 112.8(c)]", order: 12 },
+    { templateId, section: "Bulk Storage Containers", questionText: "Do containers have localized dry/dead vegetation? 40 CFR 112.8(c)", recommendResponse: "Remove excessive vegetation around bulk tank storage areas. This prevents accidental fires of dried vegetation which could ignite the nearby bulk storage tank. [Reference CFR 40 CFR 112.8(c)]", order: 13 },
+    { templateId, section: "Bulk Storage Containers", questionText: "Are containers marked properly? Visible to emergency responders - Warning, Product label, NFPA/DOT labeling? 40 CFR 112.8(c)", recommendResponse: "Tanks need to be marked properly and accordingly to what is being stored inside of them. [Reference CFR 40 CFR 112.8(c)]", order: 14 },
+    { templateId, section: "Bulk Storage Containers", questionText: "Are container tops and surroundings free of combustible materials, debris, and stains? 40 CFR 112.8(c)", recommendResponse: "Ensure container tops and surroundings are free of combustible materials, debris, and stains [Reference CFR 40 CFR 112.8(c)]", order: 15 },
+    { templateId, section: "Bulk Storage Containers", questionText: "Are test liquid sensing devices regularly checked? 40 CFR 112.8(c)", recommendResponse: "Liquid sensing devices need to be tested frequently to ensure that they are in good working order. If the sensing devices fail, then those need to be replaced immediately. [Reference CFR 40 CFR 112.8(c)]", order: 16 },
+    { templateId, section: "Bulk Storage Containers", questionText: "Are tank vents clear so they may properly operate? 40 CFR 112.8(c)", recommendResponse: "Air vents need to be cleared off and free from debris so they can properly displace hazardous fumes and build up of pressure. [Reference CFR 40 CFR 112.8(c)]", order: 17 },
+    { templateId, section: "Bulk Storage Containers", questionText: "Is possible leakage from defective internal heating coils monitored by steam return and exhaust? 40 CFR 112.8(c)(7)", recommendResponse: "Ensure no leakage by monitoring steam return and exhaust lines [Reference CFR 40 CFR 112.8(c)]", order: 18 },
+    { templateId, section: "Containment Requirements", questionText: "Do all bulk storage containers have adequate secondary containment? 40 CFR 112.7(c)", recommendResponse: "Provide secondary containment for all containers 55 gallons or above. [Reference CFR 40 CFR 112.7(c)]", order: 19 },
+    { templateId, section: "Containment Requirements", questionText: "Do all mobile/portable containers have adequate secondary containment or diverting equipment? 40 CFR 112.7(c)", recommendResponse: "Provide general secondary containment methods for portable containers. [Reference CFR 40 CFR 112.7(c)]", order: 20 },
+    { templateId, section: "Containment Requirements", questionText: "Do all oil filled operational equipment (OFOE) have adequate secondary containment or alternative measures? 40 CFR 112.7(c)", recommendResponse: "Provide secondary containment or alternative measures [Reference CFR 40 CFR 112.7(c)]", order: 21 },
+    { templateId, section: "Containment Requirements", questionText: "Does the facility have procedures for inspections/monitoring program to detect equipment failure and/or a discharge? 40 CFR 112.7(k)", recommendResponse: "Provide procedures for inspections and monitoring program [Reference CFR 40 CFR 112.7(k)]", order: 22 },
+    { templateId, section: "Containment Requirements", questionText: "Do all oil filled electrical equipment (OFEE) have adequate secondary containment or alternative measure described? 40 CFR 112.7(c)", recommendResponse: "Provide secondary containment or alternative measures [Reference CFR 40 CFR 112.7(c)]", order: 23 },
+    { templateId, section: "Containment Requirements", questionText: "Does the facility have procedures for inspections/monitoring program to detect equipment failure? 40 CFR 112.7(k)", recommendResponse: "Provide procedures for inspections and monitoring program [Reference CFR 40 CFR 112.7(k)]", order: 24 },
+    { templateId, section: "Containment Requirements", questionText: "Do all piping and related appurtenances have adequate secondary containment or diverting equipment? 40 CFR 112.7(c)", recommendResponse: "Provide secondary containment or diverting equipment [Reference CFR 40 CFR 112.7(c)]", order: 25 },
+    { templateId, section: "Containment Requirements", questionText: "Do all mobile refuelers or non-transportation-related tank cars have adequate secondary containment or diverting equipment? 40 CFR 112.7(c)", recommendResponse: "Provide secondary containment or diverting equipment [Reference CFR 40 CFR 112.7(c)]", order: 26 },
+    { templateId, section: "Containment Requirements", questionText: "Do all transfer areas, equipment and activities have adequate secondary containment or diverting equipment? 40 CFR 112.7(c)", recommendResponse: "Provide secondary containment or diverting equipment [Reference CFR 40 CFR 112.7(c)]", order: 27 },
+    { templateId, section: "Facility Drainage", questionText: "Is drainage from diked storage areas restrained by valves? 40 CFR 112.8(b)", recommendResponse: "Valves should be closed to prevent accidental release of fluid from the dike containment. If valves are leaking while closed, then those valves need to be replaced immediately. [Reference CFR 40 CFR 112.8(b)]", order: 28 },
+    { templateId, section: "Facility Drainage", questionText: "Manually activated pumps or ejectors are inspected prior to draining dike? 40 CFR 112.8(b)", recommendResponse: "Inspections must be conducted for manually activated pumps [Reference CFR 40 CFR 112.8(b)]", order: 29 },
+    { templateId, section: "Facility Drainage", questionText: "Is stormwater drainage inspected before discharge if released? 40 CFR 112.8(b)", recommendResponse: "Replace containment bypass valves if they are not sealing closed when not draining rainwater. Look for faulty alarms as well during this time. [Reference CFR 40 CFR 112.8(b)]", order: 30 },
+    { templateId, section: "Facility Drainage", questionText: "Is capacity level adequate? 40 CFR 112.8(b)", recommendResponse: "Make modifications to facility drainage to ensure it is adequate [Reference CFR 40 CFR 112.8(b)]", order: 31 },
+    { templateId, section: "Facility Drainage", questionText: "Is the dike or berm floor impermeable? 40 CFR 112.8(b)", recommendResponse: "Make modifications to dike or berm floor. [Reference CFR 40 CFR 112.8(b)]", order: 32 },
+    { templateId, section: "Facility Drainage", questionText: "Is the diked area free of debris? 40 CFR 112.8(b)", recommendResponse: "Clean up the diked area of debris [Reference CFR 40 CFR 112.8(b)]", order: 33 },
+    { templateId, section: "Facility Drainage", questionText: "Is the diked area free of erosion? 40 CFR 112.8(b)", recommendResponse: "Repair the areas of erosion that affect the diked area [Reference CFR 40 CFR 112.8(b)]", order: 34 },
+    { templateId, section: "Facility Drainage", questionText: "Is the diked area free from presence of oil discharges? 40 CFR 112.8(b)", recommendResponse: "Leaks in diked areas need to be sealed up and the dikes need to be able to contain the spill it was designed for. If the dikes are not able to contain the spill, then rebuilding of those dikes need to be performed. [Reference CFR 40 CFR 112.8(b)]", order: 35 },
+    { templateId, section: "Facility Drainage", questionText: "Is drainage from undiked areas free from potential to flow into ponds? 40 CFR 112.8(b)", recommendResponse: "Restrict drainage from flowing into ponds [Reference CFR 40 CFR 112.8(b)]", order: 36 },
+    { templateId, section: "Facility Drainage", questionText: "Is catchment basin located away from flood areas? 40 CFR 112.8(b)", recommendResponse: "Make adjustments to catchment basin to not flow into flood areas [Reference CFR 40 CFR 112.8(b)]", order: 37 },
+    { templateId, section: "Facility Drainage", questionText: "Is the undiked area free of erosion paths? 40 CFR 112.8(b)", recommendResponse: "Repair or modify property to remove erosion paths [Reference CFR 40 CFR 112.8(b)]", order: 38 },
+    { templateId, section: "Facility Drainage", questionText: "The undiked area has availability and capacity to contain a release? 40 CFR 112.8(b)", recommendResponse: "Improve the undiked area so that it has availability and capacity to contain a release [Reference CFR 40 CFR 112.8(b)]", order: 39 },
+    { templateId, section: "Facility Drainage", questionText: "Is the undiked area free of spilled/leaked materials? 40 CFR 112.8(b)", recommendResponse: "Clean the undiked area from spilled materials. [Reference CFR 40 CFR 112.8(b)]", order: 40 },
+    { templateId, section: "Facility Drainage", questionText: "Is the undiked area free of debris materials? 40 CFR 112.8(b)", recommendResponse: "Clean the undiked area from debris materials [Reference CFR 40 CFR 112.8(b)]", order: 41 },
+    { templateId, section: "Facility Drainage", questionText: "Is the undiked area free of stressed vegetation? 40 CFR 112.8(b)", recommendResponse: "Investigate why there is stressed vegetation and make correction to current or past leaks [Reference CFR 40 CFR 112.8(b)]", order: 42 },
+    { templateId, section: "Facility Transfer Operations", questionText: "Aboveground valves, piping and appurtenances inspected regularly?", recommendResponse: "Above ground valves, piping, and appurtenances should be inspected regularly to find deficiencies or other problems. Those inspections should be documented as well as issues fixed.", order: 43 },
+    { templateId, section: "Facility Transfer Operations", questionText: "Does buried piping installed or replaced on or after August 16, 2002 have protective wrapping or coating? 40 CFR 112.8(d)", recommendResponse: "Assure buried piping installed or replaced on or after August 16, 2002 has protective wrapping or coating [Reference CFR 40 CFR 112.8(d)]", order: 44 },
+    { templateId, section: "Facility Transfer Operations", questionText: "Is buried piping exposed for any reason inspected for deterioration, corrosion damage and flagged for corrective action? 40 CFR 112.8(d)", recommendResponse: "Buried piping should also be tested every 5 years for leaks. [Reference CFR 40 CFR 112.8(d)]", order: 45 },
+    { templateId, section: "Facility Transfer Operations", questionText: "Are pipe supports properly designed to minimize abrasion and corrosion, and allow for expansion and contraction? 40 CFR 112.8(d)", recommendResponse: "Ensure pipe supports are properly designed to minimize abrasion and corrosion [Reference CFR 40 CFR 112.8(d)]", order: 46 },
+    { templateId, section: "Facility Transfer Operations", questionText: "Are aboveground valves, piping, and appurtenances inspected regularly to assess their general condition?", recommendResponse: "Regularly inspect all aboveground valves, piping, and appurtenances to assess their general condition", order: 47 },
+    { templateId, section: "Facility Transfer Operations", questionText: "Is integrity and leak testing conducted on buried piping at time of installation, modification, construction, relocation or replacement? 40 CFR 112.8", recommendResponse: "Ensure integrity and leak testing has been conducted on buried piping at time of installation, modification, construction, relocation, or replacement", order: 48 },
+    { templateId, section: "Facility Transfer Operations", questionText: "Are vehicles warned so that no vehicle endangers aboveground piping and other oil transfer operations? 40 CFR 112.8(d)", recommendResponse: "Vehicles entering and exiting the area during a transferring process should be warned sufficiently, especially when above ground piping and other transfer operations are in process. [Reference CFR 40 CFR 112.8(d)]", order: 49 },
+    { templateId, section: "Facility Transfer Operations", questionText: "Are interlocks, warning light or physical barrier, wheel chocks or vehicle brake available and working? 40 CFR 112.8(d)", recommendResponse: "Put equipment in service - Interlocks, warning light or physical barrier, wheel chocks or vehicle brake [Reference CFR 40 CFR 112.8(d)]", order: 50 },
+    { templateId, section: "Facility Transfer Operations", questionText: "Are discharges cleaned up (if applicable)? 40 CFR 112.8(d)", recommendResponse: "Clean up past spills or releases of oil products [Reference CFR 40 CFR 112.8(d)]", order: 51 },
+    { templateId, section: "Foundation", questionText: "Is the foundation free of cracks? 40 CFR 112.8(c)", recommendResponse: "Repair foundation to ensure it is sealed from possible releases [Reference CFR 40 CFR 112.8(c)]", order: 52 },
+    { templateId, section: "Foundation", questionText: "Is the foundation free of discoloration from past releases? 40 CFR 112.8(c)", recommendResponse: "Clean up past release in foundation [Reference CFR 40 CFR 112.8(c)]", order: 53 },
+    { templateId, section: "Foundation", questionText: "Is the foundation level with no evident settling? 40 CFR 112.8(c)", recommendResponse: "Tanks need to be on a firm, secure surface. If the structure or foundation is sinking or becoming unlevel, then that tank needs to be taken out of service and the foundation needs to be fixed. [Reference CFR 40 CFR 112.8(c)]", order: 54 },
+    { templateId, section: "Foundation", questionText: "Is the foundation free of gaps between tank and foundation? 40 CFR 112.8(c)", recommendResponse: "Repair the foundation where there are gaps [Reference CFR 40 CFR 112.8(c)]", order: 55 },
+    { templateId, section: "Foundation", questionText: "Is the foundation free of damage caused by vegetation roots? 40 CFR 112.8(c)", recommendResponse: "Repair damage to foundation caused by vegetation [Reference CFR 40 CFR 112.8(c)]", order: 56 },
+    { templateId, section: "Inspection Requirements", questionText: "Was the monthly facility inspection conducted last month? 40 CFR 112.7(e)", recommendResponse: "Review why the inspection did not occur and correct findings [Reference CFR 40 CFR 112.7(e)]", order: 57 },
+    { templateId, section: "Inspection Requirements", questionText: "Are 3 years' worth of records available on request? 40 CFR 112.7(e)", recommendResponse: "Establish a records system for inspections and ensure they are maintained for 3 years [Reference CFR 40 CFR 112.7(e)]", order: 58 },
+    { templateId, section: "Loading and Unloading Rack", questionText: "Does loading/unloading rack drainage flow to catch or treat discharges? 40 CFR 112.7(h)", recommendResponse: "Provide secondary containment for loading and unloading rack [Reference CFR 40 CFR 112.7(h)]", order: 59 },
+    { templateId, section: "Loading and Unloading Rack", questionText: "Containment system holds at least the capacity of the largest single compartment? 40 CFR 112.8(d)", recommendResponse: "Ensure containment is adequate [Reference CFR 40 CFR 112.8(d)]", order: 60 },
+    { templateId, section: "Loading and Unloading Rack", questionText: "An interlocked warning light or physical barriers, warning signs, wheel chocks, or vehicle brake system available? 40 CFR 112.8(d)", recommendResponse: "Provide physical barriers, warning signs, wheel chocks, or other devices at loading/unloading rack [Reference CFR 40 CFR 112.8(d)]", order: 61 },
+    { templateId, section: "Loading and Unloading Rack", questionText: "Employees inspecting for discharges the lowermost drain and outlets? 40 CFR 112.8(d)", recommendResponse: "Inspecting must be conducted for discharges at the lowermost drain and outlets [Reference CFR 40 CFR 112.8(d)]", order: 62 },
+    { templateId, section: "Out of Service Containers", questionText: "All fluids removed, all openings closed (piping, gauges closed off), and container marked \"NOT IN SERVICE\"?", recommendResponse: "Properly place bulk container out of service", order: 63 },
+    { templateId, section: "Personnel Training", questionText: "Training of oil-handling personnel in operation and maintenance of equipment to prevent discharges? 40 CFR 112.7(f)", recommendResponse: "Provide employees training on how to prevent discharges [Reference CFR 40 CFR 112.7(f)]", order: 64 },
+    { templateId, section: "Personnel Training", questionText: "Training of oil-handling personnel in operation and maintenance of discharge procedure protocols? 40 CFR 112.7(f)", recommendResponse: "Provide training on discharge procedure protocols [Reference CFR 40 CFR 112.7(f)]", order: 65 },
+    { templateId, section: "Personnel Training", questionText: "Are 3 years' worth of training records available on request? 40 CFR 112.7(f)", recommendResponse: "Review why the training records are not available [Reference CFR 40 CFR 112.7(f)]", order: 66 },
+    { templateId, section: "Piping and Equipment", questionText: "Are aboveground piping, hoses, fittings or valves in good working condition?", recommendResponse: "Above ground piping, hoses, valves, and fittings need to be in good working order. If components are not in good working order, then they need to be replaced immediately.", order: 67 },
+    { templateId, section: "Piping and Equipment", questionText: "Are piping, hoses, valves, or fittings free of evidence of oil residue? 40 CFR 112.8(d)", recommendResponse: "Piping, hoses, valves, or fittings that are leaking or have evidence of oil residue need to have those components checked, tightened, or replaced immediately. [Reference CFR 40 CFR 112.8(d)]", order: 68 },
+    { templateId, section: "Piping and Equipment", questionText: "Are pipes free of discoloration? 40 CFR 112.8(d)", recommendResponse: "Investigate the discoloration to determine releases from pipes [Reference CFR 40 CFR 112.8(d)]", order: 69 },
+    { templateId, section: "Piping and Equipment", questionText: "Are pipes free of corrosion? 40 CFR 112.8(d)", recommendResponse: "Evaluate the depth of rust, clean and recoat pipes [Reference CFR 40 CFR 112.8(d)]", order: 70 },
+    { templateId, section: "Piping and Equipment", questionText: "Are spans of pipe between supports free from bowing? 40 CFR 112.8(d)", recommendResponse: "Provide additional pipe supports to reduce bowing [Reference CFR 40 CFR 112.8(d)]", order: 71 },
+    { templateId, section: "Piping and Equipment", questionText: "Are valves or seals free of evidence of stored material seepage? 40 CFR 112.8(d)", recommendResponse: "Assure there is no evidence of stored material seepage from valves or seals, note and correct if this is observed [Reference CFR 40 CFR 112.8(d)]", order: 72 },
+    { templateId, section: "Piping and Equipment", questionText: "Is the area free of localized dead vegetation? 40 CFR 112.8(d)", recommendResponse: "Investigate the cause of the dead vegetation and fix equipment and clean up past release [Reference CFR 40 CFR 112.8(d)]", order: 73 },
+    { templateId, section: "Releases from Diked Containment", questionText: "Are records of release documented? 40 CFR 112.8(b)", recommendResponse: "Records of release must be kept [Reference CFR 40 CFR 112.8(b)]", order: 74 },
+    { templateId, section: "Security Measures", questionText: "Are oil handling, processing and storage areas secure, or have controlled access? 40 CFR 112.7(g)", recommendResponse: "Secure all oil handling, processing and storage areas [Reference CFR 40 CFR 112.7(g)]", order: 75 },
+    { templateId, section: "Security Measures", questionText: "Are master flow and drain valves secured in closed position when in a non-operating or standby status? 40 CFR 112.7(g)", recommendResponse: "Master flow and drain valves should be secured and closed when not in use to prevent accidental release of liquid from bulk tanks. [Reference CFR 40 CFR 112.7(g)]", order: 76 },
+    { templateId, section: "Security Measures", questionText: "Starter controls on oil pumps prevented from unauthorized access? 40 CFR 112.7(g)", recommendResponse: "Start controls should be locked, if applicable, during non-operational hours to prevent accidental releases of fluids. This would also prevent theft or vandalism of fluids during non-working hours. [Reference CFR 40 CFR 112.7(g)]", order: 77 },
+    { templateId, section: "Security Measures", questionText: "Are out-of-service and loading/unloading connections of oil pipelines secured with caps or blanks? 40 CFR 112.7(g)", recommendResponse: "Loading and unloading connections should be capped and/or blank-flanged when not in service to prevent foreign materials into service pumps or tanks. [Reference CFR 40 CFR 112.7(g)]", order: 78 },
+    { templateId, section: "Security Measures", questionText: "Are lights working properly to detect a spill at night? 40 CFR 112.7(g)", recommendResponse: "Lights should be in positions where spills can be detected quickly at night. This includes bulk storage areas, fuel filling stations, and other storage systems that could result in leaks, spills, or excessive amounts of liquid. [Reference CFR 40 CFR 112.7(g)]", order: 79 },
+    { templateId, section: "Security Measures", questionText: "Are all warning signs properly posted and readable? 40 CFR 112.7(g)", recommendResponse: "Warning signs need to be posted properly and readable. Signs that are not readable or properly posted per NFPA regulations need to be replaced. [Reference CFR 40 CFR 112.7(g)]", order: 80 },
+    { templateId, section: "Security Measures", questionText: "Are spill kits easily accessible, protected from the weather, complete, and replenished if necessary? 40 CFR 112.7", recommendResponse: "Spill kits must be maintained and in good condition in case of use. Kits that need to be restocked should be done so in a timely manner in the event of a spill. Spill containment kits should also be weather resistant. [Reference CFR 40 CFR 112.7]", order: 81 },
+    { templateId, section: "Security Measures", questionText: "Are vehicle guard posts (bollards) properly secured?", recommendResponse: "Guards that are in place to prevent vehicles from running into bulk storage tanks accidentally must be in good working condition or must be replaced immediately.", order: 82 },
+  ];
+}
+
 // ── Seed default templates and admin account ─────────────────────────────────
 async function seedDatabase() {
   const existing = storage.getTemplates();
-  if (existing.length > 0) return;
+  if (existing.length > 0) {
+    // DB already seeded — but check if SPCC questions need updating
+    reseedSPCC();
+    return;
+  }
 
   // SPCC Template
   const spcc = db.insert(inspectionTemplates).values({
@@ -282,25 +397,7 @@ async function seedDatabase() {
     description: "Spill Prevention, Control, and Countermeasure monthly facility inspection per 40 CFR Part 112"
   }).returning().get();
 
-  const spccQuestions = [
-    { templateId: spcc.id, section: "Oil Storage Containers", questionText: "Are all aboveground oil storage containers free of visible leaks, cracks, or damage?", order: 1 },
-    { templateId: spcc.id, section: "Oil Storage Containers", questionText: "Are tank levels within normal operating range?", order: 2 },
-    { templateId: spcc.id, section: "Oil Storage Containers", questionText: "Are all container labels and markings legible and accurate?", order: 3 },
-    { templateId: spcc.id, section: "Oil Storage Containers", questionText: "Is secondary containment intact, clean, and free of oil accumulation?", order: 4 },
-    { templateId: spcc.id, section: "Oil Storage Containers", questionText: "Are containment drain valves in the closed/sealed position?", order: 5 },
-    { templateId: spcc.id, section: "Transfer Operations & Piping", questionText: "Are all oil transfer hoses and piping free of visible leaks?", order: 6 },
-    { templateId: spcc.id, section: "Transfer Operations & Piping", questionText: "Are transfer connections and fittings in good condition?", order: 7 },
-    { templateId: spcc.id, section: "Transfer Operations & Piping", questionText: "Are flow valves functioning properly and labeled?", order: 8 },
-    { templateId: spcc.id, section: "Spill Response Equipment", questionText: "Are spill response materials (absorbents, pads, booms) readily accessible and adequately stocked?", order: 9 },
-    { templateId: spcc.id, section: "Spill Response Equipment", questionText: "Are spill kits clearly marked and in designated locations?", order: 10 },
-    { templateId: spcc.id, section: "Spill Response Equipment", questionText: "Has any spill response equipment been used and needs restocking?", order: 11 },
-    { templateId: spcc.id, section: "Drainage & Stormwater Controls", questionText: "Are drainage pathways clear and unobstructed?", order: 12 },
-    { templateId: spcc.id, section: "Drainage & Stormwater Controls", questionText: "Are floor drains, catch basins, and oil-water separators functioning properly?", order: 13 },
-    { templateId: spcc.id, section: "Drainage & Stormwater Controls", questionText: "Is there evidence of oil sheening in drainage areas or nearby waterways?", order: 14 },
-    { templateId: spcc.id, section: "Recordkeeping & Training", questionText: "Are the most recent inspection records on file and up to date?", order: 15 },
-    { templateId: spcc.id, section: "Recordkeeping & Training", questionText: "Have all required personnel completed current-year SPCC training?", order: 16 },
-    { templateId: spcc.id, section: "Recordkeeping & Training", questionText: "Are emergency contact numbers posted and current?", order: 17 },
-  ];
+  const spccQuestions = getSPCCQuestions(spcc.id);
   for (const q of spccQuestions) {
     db.insert(inspectionQuestions).values({ ...q, required: true }).run();
   }

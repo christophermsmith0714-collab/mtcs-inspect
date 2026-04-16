@@ -46,6 +46,7 @@ export const inspectionQuestions = sqliteTable("inspection_questions", {
   templateId: integer("template_id").notNull(),
   section: text("section").notNull(),
   questionText: text("question_text").notNull(),
+  recommendResponse: text("recommend_response").default(""),
   order: integer("order").notNull().default(0),
   required: integer("required", { mode: "boolean" }).notNull().default(true),
 });
