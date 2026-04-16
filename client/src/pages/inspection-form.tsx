@@ -32,12 +32,13 @@ export default function InspectionFormPage({
   const resolvedTemplateId = templateId ?? existing?.templateId ?? 1;
   const template = getTemplate(resolvedTemplateId);
 
-  // Fetch questions from API — always fresh, never hardcoded
+  // Fetch questions from API — only once logged in (token is available)
   const { data: questions = [], isLoading: questionsLoading, error: questionsError } = useQuery<Question[]>({
     queryKey: [`/api/templates/${resolvedTemplateId}/questions`],
     queryFn: getQueryFn({ on401: "returnNull" }),
     staleTime: 0,
-    retry: 1,
+    retry: 2,
+    enabled: !!currentUser,
   });
   const sections = [...new Set(questions.map((q: Question) => q.section))];
 
@@ -224,7 +225,9 @@ export default function InspectionFormPage({
   const progress = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0;
 
   // ── Loading / error states ──────────────────────────────────────────────────────
-  if (questionsLoading) {
+
+  // Wait for auth + questions
+  if (!currentUser || questionsLoading) {
     return (
       <Layout title="Loading...">
         <div className="flex items-center justify-center py-20">
@@ -239,7 +242,9 @@ export default function InspectionFormPage({
     return (
       <Layout title="Error">
         <div className="flex flex-col items-center justify-center py-20 gap-4">
-          <p className="text-muted-foreground">Could not load inspection questions. Please try again.</p>
+          <p className="text-muted-foreground">
+            {questionsError ? "Could not load inspection questions. Please try again." : "No questions found for this template. Please contact your administrator."}
+          </p>
           <Button onClick={() => navigate("/dashboard")}>Back to Dashboard</Button>
         </div>
       </Layout>
