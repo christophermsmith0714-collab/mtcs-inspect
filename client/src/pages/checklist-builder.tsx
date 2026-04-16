@@ -28,7 +28,7 @@ type QuestionDraft = {
 export default function ChecklistBuilderPage({ templateId }: { templateId: number }) {
   const [, navigate] = useHashLocation();
   const { toast } = useToast();
-  const { loadTemplates } = useStore();
+  const { loadTemplates, templates: storeTemplates } = useStore();
 
   const [template, setTemplate] = useState<Template | null>(null);
   const [questions, setQuestions] = useState<QuestionDraft[]>([]);
@@ -66,23 +66,44 @@ export default function ChecklistBuilderPage({ templateId }: { templateId: numbe
   const sections = [...new Set(questions.map(q => q.section))];
 
   useEffect(() => {
+    // If store already has templates, use them immediately
+    const t = storeTemplates.find(x => x.id === templateId);
+    if (t) {
+      setTemplate(t);
+      setTmplName(t.name);
+      setTmplDesc(t.description || "");
+      setTmplType(t.type || "custom");
+    }
+
+    // Always fetch questions fresh from API
     setLoading(true);
-    Promise.all([
-      apiRequest("GET", `/api/templates`).then(r => r.json()),
-      apiRequest("GET", `/api/templates/${templateId}/questions`).then(r => r.json()),
-    ]).then(([tmpls, qs]) => {
-      const t = tmpls.find((x: Template) => x.id === templateId);
-      if (t) {
-        setTemplate(t);
-        setTmplName(t.name);
-        setTmplDesc(t.description || "");
-        setTmplType(t.type || "custom");
-      }
-      setQuestions((qs as Question[]).map(q => ({ ...q, dirty: false })));
-    }).catch(() => {
-      toast({ title: "Failed to load template", variant: "destructive" });
-    }).finally(() => setLoading(false));
-  }, [templateId]);
+    apiRequest("GET", `/api/templates/${templateId}/questions`)
+      .then(async r => {
+        if (!r.ok) throw new Error("Failed to load questions");
+        return r.json();
+      })
+      .then((qs: Question[]) => {
+        setQuestions(qs.map(q => ({ ...q, dirty: false })));
+        // If store didn't have the template yet, fetch it directly
+        if (!t) {
+          return apiRequest("GET", "/api/templates")
+            .then(r => r.ok ? r.json() : [])
+            .then((tmpls: Template[]) => {
+              const found = tmpls.find(x => x.id === templateId);
+              if (found) {
+                setTemplate(found);
+                setTmplName(found.name);
+                setTmplDesc(found.description || "");
+                setTmplType(found.type || "custom");
+              }
+            });
+        }
+      })
+      .catch(() => {
+        toast({ title: "Failed to load checklist", variant: "destructive" });
+      })
+      .finally(() => setLoading(false));
+  }, [templateId, storeTemplates.length]);
 
   const handleSaveTemplate = async () => {
     if (!tmplName.trim()) { toast({ title: "Name is required", variant: "destructive" }); return; }

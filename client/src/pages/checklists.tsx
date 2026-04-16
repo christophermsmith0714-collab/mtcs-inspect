@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useHashLocation } from "wouter/use-hash-location";
 import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -15,12 +15,19 @@ export default function ChecklistsPage() {
   const [, navigate] = useHashLocation();
   const { currentUser, templates, loadTemplates } = useStore();
   const { toast } = useToast();
+  const [pageLoading, setPageLoading] = useState(templates.length === 0);
 
   const [showNew, setShowNew] = useState(false);
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState("custom");
   const [newDesc, setNewDesc] = useState("");
   const [creating, setCreating] = useState(false);
+
+  // Always refresh template list when this page mounts
+  useEffect(() => {
+    setPageLoading(true);
+    loadTemplates().finally(() => setPageLoading(false));
+  }, []);
 
   if (currentUser?.role !== "admin") {
     navigate("/dashboard");
