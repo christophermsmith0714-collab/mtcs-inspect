@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useStore } from "@/lib/store";
 import { getTemplate, type Answer, type Question } from "@/lib/data";
-import { Camera, X, CheckCircle, ChevronDown, ChevronUp, Send, Save, ArrowLeft, Mail, FileDown, Loader2 } from "lucide-react";
+import { Camera, X, CheckCircle, ChevronDown, ChevronUp, Share2, Save, ArrowLeft, FileDown, Loader2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 type AnswerState = { answer: "yes" | "no" | "n/a" | ""; comments: string; photos: string[] };
@@ -54,11 +54,11 @@ export default function InspectionFormPage({
   const [generalComments, setGeneralComments] = useState(existing?.generalComments ?? "");
   const [headerDone, setHeaderDone] = useState(!!existing);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [sendToEmail, setSendToEmail] = useState("");
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [reportReady, setReportReady] = useState<{ emailSent: boolean; pdfDownloaded: boolean; emailError?: string } | null>(null);
+  const [reportReady, setReportReady] = useState(false);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [pdfFilename, setPdfFilename] = useState("");
   const [inspId, setInspId] = useState<number | null>(inspectionId);
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
@@ -146,7 +146,7 @@ export default function InspectionFormPage({
     }
   };
 
-  const handleComplete = () => {
+  const handleGenerateReport = async () => {
     if (!facility.trim()) { toast({ title: "Facility name required", variant: "destructive" }); return; }
     const unanswered = questions.filter(q => !answers[q.id]?.answer);
     if (unanswered.length > 0) {
@@ -157,30 +157,14 @@ export default function InspectionFormPage({
       });
       return;
     }
-    setShowEmailModal(true);
-  };
-
-  const handleSendReport = async () => {
-    if (!sendToEmail.trim()) {
-      toast({ title: "Email address required", variant: "destructive" }); return;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(sendToEmail.trim())) {
-      toast({ title: "Invalid email address", variant: "destructive" }); return;
-    }
 
     setGeneratingPdf(true);
-
     try {
-      // Save inspection + answers to DB, mark completed
       const id = await ensureInspection();
       const allAnswers = buildAnswerArray();
       await saveAnswers(id, allAnswers);
       await updateInspection(id, { status: "completed", completedAt: new Date().toISOString() });
 
-      const completedAt = new Date().toISOString();
-
-      // Generate PDF via backend
       const payload = {
         facility, address, inspector, date, generalComments,
         templateName: template?.name ?? "Inspection Report",
@@ -194,34 +178,49 @@ export default function InspectionFormPage({
         })),
         clientName: currentUser?.name ?? "",
         clientEmail: currentUser?.email ?? "",
-        sendToEmail: sendToEmail.trim(),
-        completedAt,
+        sendToEmail: "",
+        completedAt: new Date().toISOString(),
         mtcsContact: "info@midwest-training.com",
       };
 
       const result = await apiRequest("POST", "/api/generate-pdf", payload).then(r => r.json());
-      let pdfDownloaded = false;
 
       if (result.pdf) {
         const bytes = Uint8Array.from(atob(result.pdf), c => c.charCodeAt(0));
         const blob = new Blob([bytes], { type: "application/pdf" });
+        const filename = `InspectionReport_${facility.replace(/\s+/g, "_")}_${date}.pdf`;
+
+        // Auto-download
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url;
-        a.download = `InspectionReport_${facility.replace(/\s+/g, "_")}_${date}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        pdfDownloaded = true;
-      }
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
 
-      setGeneratingPdf(false);
-      setReportReady({ emailSent: result.emailSent, pdfDownloaded, emailError: result.emailError });
+        setPdfBlob(blob);
+        setPdfFilename(filename);
+        setReportReady(true);
+      }
     } catch (err) {
-      console.error("PDF/email failed:", err);
+      console.error("PDF generation failed:", err);
+      toast({ title: "Could not generate report", description: "Please try again.", variant: "destructive" });
+    } finally {
       setGeneratingPdf(false);
-      setReportReady({ emailSent: false, pdfDownloaded: false, emailError: "Could not reach server" });
+    }
+  };
+
+  const handleShare = async () => {
+    if (!pdfBlob) return;
+    const file = new File([pdfBlob], pdfFilename, { type: "application/pdf" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: pdfFilename }); } catch {}
+    } else {
+      // Fallback: re-download
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement("a");
+      a.href = url; a.download = pdfFilename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
     }
   };
 
@@ -425,96 +424,38 @@ export default function InspectionFormPage({
         })}
       </div>
 
-      {/* Email + PDF modal */}
-      {showEmailModal && (
+      {/* Report ready modal */}
+      {reportReady && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-card rounded-xl shadow-2xl w-full max-w-md border border-border">
+          <div className="bg-card rounded-xl shadow-2xl w-full max-w-sm border border-border">
             <div className="p-6">
-
-              {/* ── Success state ── */}
-              {reportReady ? (
-                <>
-                  <div className="flex items-center gap-3 mb-5">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      reportReady.emailSent ? "bg-green-100 dark:bg-green-900/30" : "bg-yellow-100 dark:bg-yellow-900/30"
-                    }`}>
-                      <CheckCircle className={`w-5 h-5 ${reportReady.emailSent ? "text-green-600" : "text-yellow-600"}`} />
-                    </div>
-                    <div>
-                      <h2 className="font-semibold text-base">Inspection Complete!</h2>
-                      {reportReady.emailSent
-                        ? <p className="text-sm text-muted-foreground">Report emailed to <span className="font-medium text-foreground">{sendToEmail}</span></p>
-                        : <p className="text-sm text-yellow-700 dark:text-yellow-400">{reportReady.emailError || "Email could not be sent"}</p>
-                      }
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 mb-5">
-                    {reportReady.emailSent && (
-                      <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2.5 text-sm text-green-800 dark:text-green-300">
-                        <Mail className="w-4 h-4 flex-shrink-0" />
-                        <span>Email with PDF attachment sent to <strong>{sendToEmail}</strong></span>
-                      </div>
-                    )}
-                    {reportReady.pdfDownloaded && (
-                      <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2.5 text-sm text-green-800 dark:text-green-300">
-                        <FileDown className="w-4 h-4 flex-shrink-0" />
-                        <span>PDF saved to your device</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <Button className="w-full" onClick={() => { setShowEmailModal(false); setReportReady(null); navigate("/dashboard"); }}>
-                    Done — Go to Dashboard
-                  </Button>
-                </>
-              ) : (
-                /* ── Email input state ── */
-                <>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Mail className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <h2 className="font-semibold text-base">Send Inspection Report</h2>
-                      <p className="text-sm text-muted-foreground">A PDF report with cover letter will be generated.</p>
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <Label htmlFor="send-to-email" className="text-sm font-medium">Send report to</Label>
-                    <Input
-                      id="send-to-email"
-                      data-testid="input-send-to-email"
-                      type="email"
-                      placeholder="client@example.com"
-                      value={sendToEmail}
-                      onChange={e => setSendToEmail(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") handleSendReport(); }}
-                      className="mt-1.5"
-                      autoFocus
-                    />
-                  </div>
-
-                  <div className="bg-muted/60 rounded-lg p-3 mb-5 text-xs text-muted-foreground space-y-1">
-                    <div className="flex items-center gap-1.5"><FileDown className="w-3.5 h-3.5 flex-shrink-0" /><span>PDF report will download to your device</span></div>
-                    <div className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 flex-shrink-0" /><span>Email with PDF attachment will be sent</span></div>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <Button variant="outline" onClick={() => setShowEmailModal(false)} className="flex-1" disabled={generatingPdf}>
-                      Cancel
-                    </Button>
-                    <Button onClick={handleSendReport} className="flex-1 gap-2" disabled={generatingPdf} data-testid="button-send-report">
-                      {generatingPdf ? (
-                        <><Loader2 className="w-4 h-4 animate-spin" />Generating PDF...</>
-                      ) : (
-                        <><Send className="w-4 h-4" />Generate &amp; Send</>
-                      )}
-                    </Button>
-                  </div>
-                </>
-              )}
+              <div className="flex flex-col items-center text-center mb-5">
+                <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-3">
+                  <CheckCircle className="w-7 h-7 text-green-600" />
+                </div>
+                <h2 className="font-semibold text-base">Inspection Complete!</h2>
+                <p className="text-sm text-muted-foreground mt-1">Your PDF report has been downloaded to your device.</p>
+              </div>
+              <div className="space-y-2">
+                <Button className="w-full gap-2" onClick={handleShare}>
+                  <Share2 className="w-4 h-4" /> Share / Email Report
+                </Button>
+                <Button variant="outline" className="w-full gap-2" onClick={() => {
+                  // Re-download
+                  if (pdfBlob) {
+                    const url = URL.createObjectURL(pdfBlob);
+                    const a = document.createElement("a");
+                    a.href = url; a.download = pdfFilename;
+                    document.body.appendChild(a); a.click();
+                    document.body.removeChild(a); URL.revokeObjectURL(url);
+                  }
+                }}>
+                  <FileDown className="w-4 h-4" /> Download Again
+                </Button>
+                <Button variant="ghost" className="w-full" onClick={() => { setReportReady(false); navigate("/dashboard"); }}>
+                  Done — Go to Dashboard
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -530,9 +471,11 @@ export default function InspectionFormPage({
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           <span className="hidden sm:inline">{saving ? "Saving..." : "Save"}</span>
         </Button>
-        <Button onClick={handleComplete} className="gap-2 flex-1" data-testid="button-complete">
-          <Send className="w-4 h-4" />
-          Complete &amp; Send Report {progress < 100 ? `(${progress}%)` : ""}
+        <Button onClick={handleGenerateReport} className="gap-2 flex-1" disabled={generatingPdf} data-testid="button-complete">
+          {generatingPdf
+            ? <><Loader2 className="w-4 h-4 animate-spin" />Generating...</>
+            : <><FileDown className="w-4 h-4" />Generate Report {progress < 100 ? `(${progress}%)` : ""}</>
+          }
         </Button>
       </div>
     </Layout>
