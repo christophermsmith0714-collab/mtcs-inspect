@@ -17,9 +17,10 @@ export default function InspectionDetailPage({ inspectionId }: { inspectionId: n
 
   const templateId = inspection?.templateId ?? 1;
   const { data: questions = [], isLoading: questionsLoading } = useQuery<Question[]>({
-    queryKey: ["/api/templates", templateId, "questions"],
-    queryFn: getQueryFn({ on401: "throw" }),
+    queryKey: [`/api/templates/${templateId}/questions`],
+    queryFn: getQueryFn({ on401: "returnNull" }),
     staleTime: 0,
+    retry: 1,
     enabled: !!inspection,
   });
 

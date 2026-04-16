@@ -33,10 +33,11 @@ export default function InspectionFormPage({
   const template = getTemplate(resolvedTemplateId);
 
   // Fetch questions from API — always fresh, never hardcoded
-  const { data: questions = [], isLoading: questionsLoading } = useQuery<Question[]>({
-    queryKey: ["/api/templates", resolvedTemplateId, "questions"],
-    queryFn: getQueryFn({ on401: "throw" }),
-    staleTime: 0, // always re-fetch — ensures new questions show immediately
+  const { data: questions = [], isLoading: questionsLoading, error: questionsError } = useQuery<Question[]>({
+    queryKey: [`/api/templates/${resolvedTemplateId}/questions`],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    staleTime: 0,
+    retry: 1,
   });
   const sections = [...new Set(questions.map((q: Question) => q.section))];
 
@@ -222,13 +223,24 @@ export default function InspectionFormPage({
   const answeredCount = questions.filter(q => answers[q.id]?.answer).length;
   const progress = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0;
 
-  // ── Loading state ─────────────────────────────────────────────────────────
+  // ── Loading / error states ──────────────────────────────────────────────────────
   if (questionsLoading) {
     return (
       <Layout title="Loading...">
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
           <span className="text-muted-foreground">Loading inspection questions...</span>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (questionsError || questions.length === 0) {
+    return (
+      <Layout title="Error">
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <p className="text-muted-foreground">Could not load inspection questions. Please try again.</p>
+          <Button onClick={() => navigate("/dashboard")}>Back to Dashboard</Button>
         </div>
       </Layout>
     );
