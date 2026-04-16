@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useHashLocation } from "wouter/use-hash-location";
+import { useQuery } from "@tanstack/react-query";
 import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,9 +10,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useStore } from "@/lib/store";
-import { getQuestions, getTemplate, type Answer } from "@/lib/data";
+import { getTemplate, type Answer, type Question } from "@/lib/data";
 import { Camera, X, CheckCircle, ChevronDown, ChevronUp, Send, Save, ArrowLeft, Mail, FileDown, Loader2 } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getQueryFn } from "@/lib/queryClient";
 
 type AnswerState = { answer: "yes" | "no" | "n/a" | ""; comments: string; photos: string[] };
 
@@ -30,8 +31,14 @@ export default function InspectionFormPage({
   const existing = inspectionId ? getInspection(inspectionId) : null;
   const resolvedTemplateId = templateId ?? existing?.templateId ?? 1;
   const template = getTemplate(resolvedTemplateId);
-  const questions = getQuestions(resolvedTemplateId);
-  const sections = [...new Set(questions.map(q => q.section))];
+
+  // Fetch questions from API — always fresh, never hardcoded
+  const { data: questions = [], isLoading: questionsLoading } = useQuery<Question[]>({
+    queryKey: ["/api/templates", resolvedTemplateId, "questions"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    staleTime: 0, // always re-fetch — ensures new questions show immediately
+  });
+  const sections = [...new Set(questions.map((q: Question) => q.section))];
 
   // Form state
   const [facility, setFacility] = useState(existing?.facilityName ?? "");
@@ -172,7 +179,7 @@ export default function InspectionFormPage({
         facility, address, inspector, date, generalComments,
         templateName: template?.name ?? "Inspection Report",
         templateType: template?.type ?? "spcc",
-        questions: questions.map(q => ({ id: q.id, questionText: q.questionText, section: q.section })),
+        questions: questions.map(q => ({ id: q.id, questionText: q.questionText, section: q.section, recommendResponse: q.recommendResponse ?? "" })),
         answers: questions.map(q => ({
           questionId: q.id,
           answer: answers[q.id]?.answer ?? "",
@@ -214,6 +221,18 @@ export default function InspectionFormPage({
 
   const answeredCount = questions.filter(q => answers[q.id]?.answer).length;
   const progress = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0;
+
+  // ── Loading state ─────────────────────────────────────────────────────────
+  if (questionsLoading) {
+    return (
+      <Layout title="Loading...">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
+          <span className="text-muted-foreground">Loading inspection questions...</span>
+        </div>
+      </Layout>
+    );
+  }
 
   // ── Header form (step 1) ──────────────────────────────────────────────────
   if (!headerDone) {

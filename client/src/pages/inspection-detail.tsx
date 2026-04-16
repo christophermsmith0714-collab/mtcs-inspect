@@ -1,17 +1,27 @@
 import { useHashLocation } from "wouter/use-hash-location";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
-import { getQuestions, getTemplate } from "@/lib/data";
-import { ArrowLeft, Edit, CheckCircle, XCircle, MinusCircle } from "lucide-react";
+import { getTemplate, type Question } from "@/lib/data";
+import { ArrowLeft, Edit, CheckCircle, XCircle, MinusCircle, Loader2 } from "lucide-react";
+import { getQueryFn } from "@/lib/queryClient";
 
 export default function InspectionDetailPage({ inspectionId }: { inspectionId: number }) {
   const [, navigate] = useHashLocation();
   const { getInspection } = useStore();
   const inspection = getInspection(inspectionId);
+
+  const templateId = inspection?.templateId ?? 1;
+  const { data: questions = [], isLoading: questionsLoading } = useQuery<Question[]>({
+    queryKey: ["/api/templates", templateId, "questions"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    staleTime: 0,
+    enabled: !!inspection,
+  });
 
   if (!inspection) return (
     <Layout title="Not Found">
@@ -20,9 +30,17 @@ export default function InspectionDetailPage({ inspectionId }: { inspectionId: n
     </Layout>
   );
 
+  if (questionsLoading) return (
+    <Layout title="Loading...">
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
+        <span className="text-muted-foreground">Loading...</span>
+      </div>
+    </Layout>
+  );
+
   const template = getTemplate(inspection.templateId);
-  const questions = getQuestions(inspection.templateId);
-  const sections = [...new Set(questions.map(q => q.section))];
+  const sections = [...new Set(questions.map((q: Question) => q.section))];
   const answerMap = new Map(inspection.answers.map(a => [a.questionId, a]));
 
   const yesCount = inspection.answers.filter(a => a.answer === "yes").length;
