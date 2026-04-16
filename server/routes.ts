@@ -494,7 +494,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     generalComments: z.string().max(5000).optional(),
     templateName: z.string().max(200),
     templateType: z.string().max(50),
-    sendToEmail: z.string().email().max(254),
+    sendToEmail: z.string().max(254).optional(),
     clientName: z.string().max(150).optional(),
     clientEmail: z.string().email().max(254).optional(),
     completedAt: z.string().optional(),
@@ -503,6 +503,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       id: z.number(),
       questionText: z.string().max(1000),
       section: z.string().max(200),
+      recommendResponse: z.string().max(2000).optional(),
     })).max(200),
     answers: z.array(z.object({
       questionId: z.number(),
@@ -542,7 +543,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
         let emailSent = false;
         let emailError = "";
-        try {
+        if (sendTo) try {
           await resend.emails.send({
             from: "Midwest Training and Consulting Services <onboarding@resend.dev>",
             to: ["chris@midwest-training.com"],
