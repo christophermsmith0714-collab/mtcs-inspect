@@ -13,7 +13,7 @@ import { Plus, ClipboardList, ChevronRight, Loader2 } from "lucide-react";
 
 export default function ChecklistsPage() {
   const [, navigate] = useHashLocation();
-  const { currentUser, templates, loadTemplates } = useStore();
+  const { currentUser, authReady, templates, loadTemplates } = useStore();
   const { toast } = useToast();
   const [pageLoading, setPageLoading] = useState(templates.length === 0);
 
@@ -23,12 +23,14 @@ export default function ChecklistsPage() {
   const [newDesc, setNewDesc] = useState("");
   const [creating, setCreating] = useState(false);
 
-  // Always refresh template list when this page mounts
+  // Refresh template list when page mounts
   useEffect(() => {
     setPageLoading(true);
     loadTemplates().finally(() => setPageLoading(false));
   }, []);
 
+  // Wait for auth before redirecting — avoids flash on re-render
+  if (!authReady) return null;
   if (currentUser?.role !== "admin") {
     navigate("/dashboard");
     return null;

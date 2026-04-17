@@ -42,6 +42,7 @@ export default function AdminPage() {
     }
   }, [authReady]);
 
+  if (!authReady) return null;
   if (currentUser?.role !== "admin") {
     navigate("/dashboard");
     return null;
