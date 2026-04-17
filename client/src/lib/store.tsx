@@ -41,6 +41,7 @@ type StoreType = {
   // Users (admin)
   users: User[];
   setUsers: (users: User[]) => void;
+  loadUsers: () => Promise<void>;
 
   // Inspections
   inspections: Inspection[];
@@ -95,6 +96,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       })
       .finally(() => setAuthReady(true));
   }, []);
+
+  // Load users from DB (admin only)
+  const loadUsers = async () => {
+    try {
+      const res = await apiRequest("GET", "/api/users");
+      if (!res.ok) return;
+      const data: any[] = await res.json();
+      const parsed = data.map((u: any) => ({
+        ...u,
+        assignedTemplates: typeof u.assignedTemplates === "string"
+          ? JSON.parse(u.assignedTemplates || "[]")
+          : (u.assignedTemplates ?? []),
+      }));
+      setUsers(parsed);
+    } catch (e) {
+      console.error("Failed to load users:", e);
+    }
+  };
 
   // Load templates from DB and populate the cache used by data.ts
   const loadTemplates = async () => {
@@ -158,11 +177,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Load templates + inspections whenever currentUser changes
+  // Load all data whenever currentUser changes
   useEffect(() => {
     if (currentUser) {
       loadTemplates();
       loadInspections();
+      if (currentUser.role === "admin") loadUsers();
     }
   }, [currentUser?.id]);
 
@@ -199,7 +219,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     <Store.Provider value={{
       currentUser, authReady, login, logout,
       templates, loadTemplates,
-      users, setUsers,
+      users, setUsers, loadUsers,
       inspections, loadInspections, addInspection, updateInspection, saveAnswers, deleteInspection, getInspection,
     }}>
       {children}

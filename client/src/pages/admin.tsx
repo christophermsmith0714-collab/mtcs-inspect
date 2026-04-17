@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useHashLocation } from "wouter/use-hash-location";
 import Layout from "@/components/layout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,41 +23,24 @@ type ClientForm = {
 const emptyForm = (): ClientForm => ({ name: "", email: "", password: "", company: "", assignedTemplates: [] });
 
 export default function AdminPage() {
-  const { currentUser, authReady, users, setUsers, inspections, templates, loadTemplates } = useStore();
+  const { currentUser, authReady, users, setUsers, loadUsers, inspections, templates } = useStore();
   const [, navigate] = useHashLocation();
   const { toast } = useToast();
 
-  const [loading, setLoading] = useState(true);
+  // Users come pre-loaded from store at login — only show spinner if truly empty after auth
+  const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<ClientForm>(emptyForm());
   const [saving, setSaving] = useState(false);
 
-  const fetchClients = useCallback(() => {
-    setLoading(true);
-    apiRequest("GET", "/api/users")
-      .then(r => r.json())
-      .then((data: any[]) => {
-        const parsed = data.map((u: any) => ({
-          ...u,
-          assignedTemplates: typeof u.assignedTemplates === "string"
-            ? JSON.parse(u.assignedTemplates || "[]")
-            : (u.assignedTemplates ?? []),
-        }));
-        setUsers(parsed);
-      })
-      .catch(err => console.error("Failed to load clients:", err))
-      .finally(() => setLoading(false));
-  }, []);
-
-  // Wait for auth to be confirmed before fetching — avoids stuck spinner
   useEffect(() => {
-    if (authReady && currentUser?.role === "admin") {
-      fetchClients();
-    } else if (authReady && currentUser?.role !== "admin") {
-      setLoading(false);
+    // Only fetch if store is empty AND auth is confirmed (first-ever load)
+    if (authReady && users.length === 0 && currentUser?.role === "admin") {
+      setLoading(true);
+      loadUsers().finally(() => setLoading(false));
     }
-  }, [authReady, currentUser?.id]);
+  }, [authReady]);
 
   if (currentUser?.role !== "admin") {
     navigate("/dashboard");
@@ -117,7 +100,7 @@ export default function AdminPage() {
         if (!res.ok) throw new Error((await res.json()).error || "Update failed");
         toast({ title: "Client updated" });
         setShowModal(false);
-        fetchClients();
+        loadUsers();
       } else {
         const res = await apiRequest("POST", "/api/clients", {
           name: form.name.trim(),
@@ -130,7 +113,7 @@ export default function AdminPage() {
         if (!res.ok) throw new Error((await res.json()).error || "Create failed");
         toast({ title: "Client created", description: `Welcome email sent to ${form.email}.` });
         setShowModal(false);
-        fetchClients();
+        loadUsers();
       }
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -145,7 +128,7 @@ export default function AdminPage() {
       const res = await apiRequest("PATCH", `/api/clients/${client.id}`, { subscriptionStatus: newStatus });
       if (!res.ok) throw new Error("Update failed");
       toast({ title: newStatus === "active" ? "Client activated" : "Client deactivated" });
-      fetchClients();
+      loadUsers();
     } catch {
       toast({ title: "Failed to update status", variant: "destructive" });
     }
