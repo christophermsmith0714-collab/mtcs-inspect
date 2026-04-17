@@ -15,7 +15,6 @@ export default function ChecklistsPage() {
   const [, navigate] = useHashLocation();
   const { currentUser, authReady, templates, loadTemplates } = useStore();
   const { toast } = useToast();
-  const [pageLoading, setPageLoading] = useState(templates.length === 0);
 
   const [showNew, setShowNew] = useState(false);
   const [newName, setNewName] = useState("");
@@ -23,10 +22,9 @@ export default function ChecklistsPage() {
   const [newDesc, setNewDesc] = useState("");
   const [creating, setCreating] = useState(false);
 
-  // Refresh template list when page mounts
+  // Only fetch if store is empty (first load) — don’t re-fetch on every mount
   useEffect(() => {
-    setPageLoading(true);
-    loadTemplates().finally(() => setPageLoading(false));
+    if (templates.length === 0) loadTemplates();
   }, []);
 
   // Redirect non-admins only after auth is confirmed
