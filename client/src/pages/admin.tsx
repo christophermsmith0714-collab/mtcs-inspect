@@ -42,11 +42,11 @@ export default function AdminPage() {
     }
   }, [authReady]);
 
-  if (!authReady) return null;
-  if (currentUser?.role !== "admin") {
-    navigate("/dashboard");
-    return null;
-  }
+  useEffect(() => {
+    if (authReady && currentUser?.role !== "admin") {
+      navigate("/dashboard");
+    }
+  }, [authReady, currentUser?.role]);
 
   const clients = users.filter(u => u.role === "client");
   const activeClients = clients.filter(u => u.subscriptionStatus === "active");

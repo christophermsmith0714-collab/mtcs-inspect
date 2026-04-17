@@ -29,12 +29,12 @@ export default function ChecklistsPage() {
     loadTemplates().finally(() => setPageLoading(false));
   }, []);
 
-  // Wait for auth before redirecting — avoids flash on re-render
-  if (!authReady) return null;
-  if (currentUser?.role !== "admin") {
-    navigate("/dashboard");
-    return null;
-  }
+  // Redirect non-admins only after auth is confirmed
+  useEffect(() => {
+    if (authReady && currentUser?.role !== "admin") {
+      navigate("/dashboard");
+    }
+  }, [authReady, currentUser?.role]);
 
   const handleCreate = async () => {
     if (!newName.trim()) { toast({ title: "Name is required", variant: "destructive" }); return; }
