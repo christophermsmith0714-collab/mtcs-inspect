@@ -14,7 +14,7 @@ import { getTemplate, type Answer, type Question } from "@/lib/data";
 import { Camera, X, CheckCircle, ChevronDown, ChevronUp, Share2, Save, ArrowLeft, FileDown, Loader2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
-type AnswerState = { answer: "yes" | "no" | "n/a" | ""; comments: string; photos: string[] };
+type AnswerState = { answer: "yes" | "no" | ""; comments: string; photos: string[] };
 
 export default function InspectionFormPage({
   templateId,
@@ -148,16 +148,6 @@ export default function InspectionFormPage({
 
   const handleGenerateReport = async () => {
     if (!facility.trim()) { toast({ title: "Facility name required", variant: "destructive" }); return; }
-    const unanswered = questions.filter(q => !answers[q.id]?.answer);
-    if (unanswered.length > 0) {
-      toast({
-        title: `${unanswered.length} question${unanswered.length > 1 ? "s" : ""} unanswered`,
-        description: "Please answer all questions before completing.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     setGeneratingPdf(true);
     try {
       const id = await ensureInspection();
@@ -225,6 +215,7 @@ export default function InspectionFormPage({
   };
 
   const answeredCount = questions.filter(q => answers[q.id]?.answer).length;
+  const skippedCount = questions.length - answeredCount;
   const progress = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0;
 
   // ── Loading / error states ──────────────────────────────────────────────────────
@@ -312,7 +303,7 @@ export default function InspectionFormPage({
       {/* Progress bar */}
       <div className="mb-4">
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-          <span>{answeredCount} of {questions.length} answered</span>
+          <span>{answeredCount} of {questions.length} answered{skippedCount > 0 ? ` · ${skippedCount} skipped` : ""}</span>
           <span>{progress}%</span>
         </div>
         <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -368,20 +359,19 @@ export default function InspectionFormPage({
                           <p className="text-sm leading-relaxed">{q.questionText}</p>
                         </div>
 
-                        {/* Yes / No / N/A */}
+                        {/* Yes / No */}
                         <div className="flex gap-2 ml-6 mb-3">
-                          {(["yes", "no", "n/a"] as const).map(opt => (
+                          {(["yes", "no"] as const).map(opt => (
                             <button key={opt} type="button"
                               data-testid={`answer-${q.id}-${opt}`}
-                              onClick={() => setAnswer(q.id, "answer", opt)}
+                              onClick={() => setAnswer(q.id, "answer", answers[q.id]?.answer === opt ? "" : opt)}
                               className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border ${
                                 a.answer === opt
                                   ? opt === "yes" ? "bg-green-600 text-white border-green-600"
-                                    : opt === "no" ? "bg-red-600 text-white border-red-600"
-                                    : "bg-gray-500 text-white border-gray-500"
+                                  : "bg-red-600 text-white border-red-600"
                                   : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary"
                               }`}>
-                              {opt === "n/a" ? "N/A" : opt}
+                              {opt}
                             </button>
                           ))}
                         </div>
@@ -474,7 +464,7 @@ export default function InspectionFormPage({
         <Button onClick={handleGenerateReport} className="gap-2 flex-1" disabled={generatingPdf} data-testid="button-complete">
           {generatingPdf
             ? <><Loader2 className="w-4 h-4 animate-spin" />Generating...</>
-            : <><FileDown className="w-4 h-4" />Generate Report {progress < 100 ? `(${progress}%)` : ""}</>
+            : <><FileDown className="w-4 h-4" />Generate Report</>
           }
         </Button>
       </div>
