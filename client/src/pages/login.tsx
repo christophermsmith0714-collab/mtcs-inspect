@@ -38,14 +38,14 @@ export default function LoginPage() {
           </div>
           <h2 className="text-3xl font-bold mb-4 leading-tight">Environmental Compliance Made Simple</h2>
           <p className="text-primary-foreground/80 text-base leading-relaxed">
-            Monthly SPCC and stormwater inspections, documented digitally. Yes/No questions, comments, and photo evidence — all in one place.
+            Monthly SPCC and stormwater inspections, documented digitally. Yes/No questions and comments — all in one place.
           </p>
         </div>
         <div className="space-y-4">
           {[
             { icon: ShieldCheck, title: "SPCC Inspections", desc: "40 CFR Part 112 compliant monthly checklists" },
             { icon: Droplets, title: "Stormwater Inspections", desc: "MSGP/SWPPP monthly inspection documentation" },
-            { icon: ClipboardCheck, title: "Photo Evidence", desc: "Capture and attach photos directly to findings" },
+            { icon: ClipboardCheck, title: "Compliance Reports", desc: "Generate professional PDF reports instantly" },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -58,7 +58,7 @@ export default function LoginPage() {
             </div>
           ))}
         </div>
-        <div className="text-xs text-primary-foreground/50">$15/month per client · Cancel anytime</div>
+
       </div>
 
       {/* Right panel */}
@@ -93,8 +93,8 @@ export default function LoginPage() {
                 </Button>
                 <div className="text-center text-xs text-muted-foreground border-t border-border pt-3">
                   Don't have an account? Contact{" "}
-                  <a href="mailto:info@midwest-training.com" className="text-primary font-medium hover:underline">
-                    info@midwest-training.com
+                  <a href="mailto:chris@midwest-training.com" className="text-primary font-medium hover:underline">
+                    chris@midwest-training.com
                   </a>
                 </div>
               </form>
