@@ -127,16 +127,10 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     // ── Top header band ──────────────────────────────────────────────────────
     doc.rect(0, 0, 612, 72).fill(rgb(GREEN_DARK));
 
-    // Logo mark: white circle with checkmark
-    doc.circle(66, 36, 18).fill(rgb(WHITE));
-    doc.fillColor(rgb(GREEN_DARK))
-      .fontSize(16).font("Helvetica-Bold")
-      .text("✓", 58, 28, { width: 18, align: "center" });
-
-    // Title + subtitle
+    // Title
     doc.fillColor(rgb(WHITE))
       .fontSize(17).font("Helvetica-Bold")
-      .text("INSPECTION REPORT", 96, 24, { width: 420 });
+      .text("INSPECTION REPORT", 50, 24, { width: 420 });
 
     // Date top-right
     doc.fontSize(8.5).font("Helvetica")
