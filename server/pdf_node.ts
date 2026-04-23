@@ -163,13 +163,12 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
 
     // ── Stats row ────────────────────────────────────────────────────────────
     const statY  = cardY + 74;
-    const statW  = 122;
-    const statGap = 5;
+    const statW  = 168;
+    const statGap = 4;
     const stats = [
-      { label: "TOTAL ANSWERED",   value: String(totalQ),       bg: GRAY_100,    border: GRAY_200, val: GRAY_900 },
-      { label: "COMPLIANT (YES)",  value: String(yesCount),     bg: GREEN_LIGHT, border: GREEN,    val: GREEN_DARK },
-      { label: "DEFICIENCIES (NO)",value: String(noCount),       bg: noCount > 0 ? RED_LIGHT : GREEN_LIGHT, border: noCount > 0 ? RED : GREEN, val: noCount > 0 ? RED : GREEN_DARK },
-      { label: "SKIPPED",          value: String(skippedCount), bg: GRAY_100,    border: GRAY_200, val: GRAY_600 },
+      { label: "TOTAL ANSWERED",    value: String(totalQ),   bg: GRAY_100,    border: GRAY_200, val: GRAY_900 },
+      { label: "COMPLIANT (YES)",   value: String(yesCount), bg: GREEN_LIGHT, border: GREEN,    val: GREEN_DARK },
+      { label: "DEFICIENCIES (NO)", value: String(noCount),  bg: noCount > 0 ? RED_LIGHT : GREEN_LIGHT, border: noCount > 0 ? RED : GREEN, val: noCount > 0 ? RED : GREEN_DARK },
     ];
     stats.forEach((s, i) => {
       const x = 50 + i * (statW + statGap);
@@ -304,15 +303,18 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     }
 
     // ── Footer on every page ─────────────────────────────────────────────────
-    const totalPages = (doc as any)._pageBuffer?.length || 1;
+    // Must call flushPages() before iterating so all pages are in the buffer
+    doc.flushPages();
     const range = doc.bufferedPageRange();
     for (let i = 0; i < range.count; i++) {
       doc.switchToPage(range.start + i);
+      doc.save();
       doc.fillColor(rgb(GRAY_400)).fontSize(7.5).font("Helvetica")
         .text(
           `Midwest Training and Consulting Services  ·  midwest-training.com  ·  Generated ${now}`,
           50, doc.page.height - 28, { width: W, align: "center" }
         );
+      doc.restore();
     }
 
     doc.end();
