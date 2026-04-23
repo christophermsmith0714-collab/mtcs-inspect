@@ -106,6 +106,22 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     doc.on("end",  () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
+    // Draw footer on every page via pageAdded event
+    const drawFooter = () => {
+      const footerY = 742;
+      doc.save();
+      doc.moveTo(50, footerY - 6).lineTo(562, footerY - 6)
+        .strokeColor(rgb(GRAY_200)).lineWidth(0.5).stroke();
+      doc.fillColor(rgb(GRAY_400)).fontSize(7.5).font("Helvetica")
+        .text(
+          `Prepared by Midwest Training and Consulting Services  ·  midwest-training.com  ·  Generated ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`,
+          50, footerY, { width: 512, align: "center" }
+        );
+      doc.restore();
+    };
+    // Fire on every new page added after page 1
+    doc.on("pageAdded", drawFooter);
+
     const answerMap: Record<number, Answer> = {};
     for (const a of data.answers) answerMap[a.questionId] = a;
 
@@ -123,6 +139,9 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     // ─────────────────────────────────────────────────────────────────────────
     // PAGE 1: INSPECTION REPORT
     // ─────────────────────────────────────────────────────────────────────────
+
+    // Draw footer on page 1 immediately (pageAdded only fires for subsequent pages)
+    drawFooter();
 
     // ── Top header band ──────────────────────────────────────────────────────
     doc.rect(0, 0, 612, 72).fill(rgb(GREEN_DARK));
@@ -296,24 +315,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
       });
     }
 
-    // ── Footer on every page ─────────────────────────────────────────────────
-    doc.flushPages();
-    const range = doc.bufferedPageRange();
-    const footerY = 742; // fixed Y, well within printable area on LETTER (792pt)
-    for (let i = 0; i < range.count; i++) {
-      doc.switchToPage(range.start + i);
-      doc.save();
-      // Separator line
-      doc.moveTo(50, footerY - 6).lineTo(562, footerY - 6)
-        .strokeColor(rgb(GRAY_200)).lineWidth(0.5).stroke();
-      // Footer text
-      doc.fillColor(rgb(GRAY_400)).fontSize(7.5).font("Helvetica")
-        .text(
-          `Prepared by Midwest Training and Consulting Services  ·  midwest-training.com  ·  Generated ${now}`,
-          50, footerY, { width: W, align: "center" }
-        );
-      doc.restore();
-    }
+
 
     doc.end();
   });
