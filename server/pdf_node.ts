@@ -106,18 +106,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     doc.on("end",  () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    // Helper to stamp footer at a fixed Y on the current page
-    const stampFooter = () => {
-      const savedY = doc.y;
-      doc.moveTo(50, 742).lineTo(562, 742)
-        .strokeColor(rgb(GRAY_200)).lineWidth(0.5).stroke();
-      doc.fillColor(rgb(GRAY_400)).fontSize(7.5).font("Helvetica")
-        .text(
-          `Midwest Training and Consulting Services  ·  midwest-training.com`,
-          50, 748, { width: 512, align: "center", lineBreak: false }
-        );
-      doc.y = savedY;
-    };
+
 
     const answerMap: Record<number, Answer> = {};
     for (const a of data.answers) answerMap[a.questionId] = a;
@@ -195,7 +184,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     }
 
     for (const [section, qs] of Object.entries(sections)) {
-      if (doc.y > 680) { stampFooter(); doc.addPage(); }
+      if (doc.y > 680) { doc.addPage(); }
       doc.moveDown(0.4);
 
       // Section header — green pill style
@@ -208,7 +197,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
       for (const q of qs) {
         const a = answerMap[q.id] || { answer: "", comments: "", photos: [] };
         const ans = a.answer.toUpperCase();
-        if (doc.y > 710) { stampFooter(); doc.addPage(); }
+        if (doc.y > 710) { doc.addPage(); }
 
         const rowY = doc.y;
         const rowBg = ans === "NO" ? RED_LIGHT : (ans === "YES" ? WHITE : GRAY_50);
@@ -247,7 +236,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
 
     // ── General Comments ─────────────────────────────────────────────────────
     if (data.generalComments?.trim()) {
-      if (doc.y > 660) { stampFooter(); doc.addPage(); }
+      if (doc.y > 660) { doc.addPage(); }
       doc.moveDown(0.5);
       const gcY = doc.y;
       doc.rect(50, gcY, W, 19).fill(rgb(GRAY_600));
@@ -262,7 +251,6 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     // RECOMMENDATIONS PAGE (only if there are NO answers)
     // ─────────────────────────────────────────────────────────────────────────
     if (noAnswers.length > 0) {
-      stampFooter();
       doc.addPage();
 
       // Header band — red
@@ -276,7 +264,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
       doc.y = 86;
 
       noAnswers.forEach((q, idx) => {
-        if (doc.y > 680) { stampFooter(); doc.addPage(); }
+        if (doc.y > 680) { doc.addPage(); }
 
         const startY = doc.y;
         const rec    = CFR_RECOMMENDATIONS[q.id];
@@ -312,7 +300,23 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
 
 
 
-    stampFooter();
+    // ── Footer on every page ─────────────────────────────────────────────────
+    // MUST read bufferedPageRange BEFORE calling end() or flushPages()
+    // flushPages() resets the buffer to empty — do NOT call it first
+    const range = doc.bufferedPageRange();
+    for (let i = 0; i < range.count; i++) {
+      doc.switchToPage(range.start + i);
+      doc.moveTo(50, 742).lineTo(562, 742)
+        .strokeColor(rgb(GRAY_200)).lineWidth(0.5).stroke();
+      doc.fillColor(rgb(GRAY_400)).fontSize(7.5).font("Helvetica")
+        .text(
+          "Midwest Training and Consulting Services  \u00b7  midwest-training.com",
+          50, 748, { width: 512, align: "center", lineBreak: false }
+        );
+    }
+    // Switch back to last page so end() finalises correctly
+    if (range.count > 0) doc.switchToPage(range.start + range.count - 1);
+
     doc.end();
   });
 }
