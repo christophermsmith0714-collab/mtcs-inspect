@@ -100,7 +100,7 @@ function roundRect(doc: PDFKit.PDFDocument, x: number, y: number, w: number, h: 
 
 export function generatePDF(data: PdfData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: "LETTER", info: { Title: `${data.templateName} — ${data.facility}` } });
+    const doc = new PDFDocument({ margin: 50, size: "LETTER", bufferPages: true, info: { Title: `${data.templateName} — ${data.facility}` } });
     const chunks: Buffer[] = [];
     doc.on("data", (c: Buffer) => chunks.push(c));
     doc.on("end",  () => resolve(Buffer.concat(chunks)));
@@ -109,11 +109,13 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     const answerMap: Record<number, Answer> = {};
     for (const a of data.answers) answerMap[a.questionId] = a;
 
+    // Only include answered questions in the report
+    const answeredQs = data.questions.filter(q => answerMap[q.id]?.answer === "yes" || answerMap[q.id]?.answer === "no");
     const noAnswers  = data.questions.filter(q => answerMap[q.id]?.answer === "no");
     const yesCount   = data.answers.filter(a => a.answer === "yes").length;
     const noCount    = data.answers.filter(a => a.answer === "no").length;
-    const naCount    = data.answers.filter(a => a.answer === "n/a").length;
-    const totalQ     = data.questions.length;
+    const skippedCount = data.questions.length - answeredQs.length;
+    const totalQ     = answeredQs.length; // report only answered questions
     const fDate      = fmtDate(data.date);
     const now        = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
     const W          = 512; // usable width (margin 50 each side)
@@ -134,9 +136,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     // Title + subtitle
     doc.fillColor(rgb(WHITE))
       .fontSize(17).font("Helvetica-Bold")
-      .text("INSPECTION REPORT", 96, 16, { width: 350 });
-    doc.fontSize(9.5).font("Helvetica")
-      .text("Midwest Training and Consulting Services  ·  Environmental Compliance", 96, 38, { width: 350 });
+      .text("INSPECTION REPORT", 96, 24, { width: 420 });
 
     // Date top-right
     doc.fontSize(8.5).font("Helvetica")
@@ -166,10 +166,10 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     const statW  = 122;
     const statGap = 5;
     const stats = [
-      { label: "TOTAL ITEMS",      value: String(totalQ),  bg: GRAY_100,    border: GRAY_200, val: GRAY_900 },
-      { label: "COMPLIANT (YES)",  value: String(yesCount), bg: GREEN_LIGHT, border: GREEN,    val: GREEN_DARK },
-      { label: "DEFICIENCIES (NO)",value: String(noCount),  bg: noCount > 0 ? RED_LIGHT : GREEN_LIGHT, border: noCount > 0 ? RED : GREEN, val: noCount > 0 ? RED : GREEN_DARK },
-      { label: "NOT APPLICABLE",   value: String(naCount),  bg: GRAY_100,   border: GRAY_200, val: GRAY_600 },
+      { label: "TOTAL ANSWERED",   value: String(totalQ),       bg: GRAY_100,    border: GRAY_200, val: GRAY_900 },
+      { label: "COMPLIANT (YES)",  value: String(yesCount),     bg: GREEN_LIGHT, border: GREEN,    val: GREEN_DARK },
+      { label: "DEFICIENCIES (NO)",value: String(noCount),       bg: noCount > 0 ? RED_LIGHT : GREEN_LIGHT, border: noCount > 0 ? RED : GREEN, val: noCount > 0 ? RED : GREEN_DARK },
+      { label: "SKIPPED",          value: String(skippedCount), bg: GRAY_100,    border: GRAY_200, val: GRAY_600 },
     ];
     stats.forEach((s, i) => {
       const x = 50 + i * (statW + statGap);
@@ -182,9 +182,9 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
 
     doc.y = statY + 58;
 
-    // ── Questions by section ─────────────────────────────────────────────────
+    // ── Questions by section (answered only) ────────────────────────────────
     const sections: Record<string, Question[]> = {};
-    for (const q of data.questions) {
+    for (const q of answeredQs) {
       (sections[q.section] = sections[q.section] || []).push(q);
     }
 
@@ -303,13 +303,17 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
       });
     }
 
-    // ── Footer ───────────────────────────────────────────────────────────────
-    const pages = (doc as any)._pageBuffer?.length || 1;
-    doc.fillColor(rgb(GRAY_400)).fontSize(7.5).font("Helvetica")
-      .text(
-        `Midwest Training and Consulting Services  ·  Generated ${now}  ·  midwest-training.com`,
-        50, doc.page.height - 30, { width: W, align: "center" }
-      );
+    // ── Footer on every page ─────────────────────────────────────────────────
+    const totalPages = (doc as any)._pageBuffer?.length || 1;
+    const range = doc.bufferedPageRange();
+    for (let i = 0; i < range.count; i++) {
+      doc.switchToPage(range.start + i);
+      doc.fillColor(rgb(GRAY_400)).fontSize(7.5).font("Helvetica")
+        .text(
+          `Midwest Training and Consulting Services  ·  midwest-training.com  ·  Generated ${now}`,
+          50, doc.page.height - 28, { width: W, align: "center" }
+        );
+    }
 
     doc.end();
   });
