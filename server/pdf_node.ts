@@ -113,7 +113,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
         .strokeColor(rgb(GRAY_200)).lineWidth(0.5).stroke();
       doc.fillColor(rgb(GRAY_400)).fontSize(7.5).font("Helvetica")
         .text(
-          `Prepared by Midwest Training and Consulting Services  ·  midwest-training.com  ·  Generated ${now}`,
+          `Midwest Training and Consulting Services  ·  midwest-training.com`,
           50, 748, { width: 512, align: "center", lineBreak: false }
         );
       doc.y = savedY;
