@@ -106,21 +106,18 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     doc.on("end",  () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    // Draw footer on every page via pageAdded event
-    const drawFooter = () => {
-      const footerY = 742;
-      doc.save();
-      doc.moveTo(50, footerY - 6).lineTo(562, footerY - 6)
+    // Helper to stamp footer at a fixed Y on the current page
+    const stampFooter = () => {
+      const savedY = doc.y;
+      doc.moveTo(50, 742).lineTo(562, 742)
         .strokeColor(rgb(GRAY_200)).lineWidth(0.5).stroke();
       doc.fillColor(rgb(GRAY_400)).fontSize(7.5).font("Helvetica")
         .text(
-          `Prepared by Midwest Training and Consulting Services  ·  midwest-training.com  ·  Generated ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`,
-          50, footerY, { width: 512, align: "center" }
+          `Prepared by Midwest Training and Consulting Services  ·  midwest-training.com  ·  Generated ${now}`,
+          50, 748, { width: 512, align: "center", lineBreak: false }
         );
-      doc.restore();
+      doc.y = savedY;
     };
-    // Fire on every new page added after page 1
-    doc.on("pageAdded", drawFooter);
 
     const answerMap: Record<number, Answer> = {};
     for (const a of data.answers) answerMap[a.questionId] = a;
@@ -139,9 +136,6 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     // ─────────────────────────────────────────────────────────────────────────
     // PAGE 1: INSPECTION REPORT
     // ─────────────────────────────────────────────────────────────────────────
-
-    // Draw footer on page 1 immediately (pageAdded only fires for subsequent pages)
-    drawFooter();
 
     // ── Top header band ──────────────────────────────────────────────────────
     doc.rect(0, 0, 612, 72).fill(rgb(GREEN_DARK));
@@ -201,7 +195,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     }
 
     for (const [section, qs] of Object.entries(sections)) {
-      if (doc.y > 680) doc.addPage();
+      if (doc.y > 680) { stampFooter(); doc.addPage(); }
       doc.moveDown(0.4);
 
       // Section header — green pill style
@@ -214,7 +208,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
       for (const q of qs) {
         const a = answerMap[q.id] || { answer: "", comments: "", photos: [] };
         const ans = a.answer.toUpperCase();
-        if (doc.y > 710) doc.addPage();
+        if (doc.y > 710) { stampFooter(); doc.addPage(); }
 
         const rowY = doc.y;
         const rowBg = ans === "NO" ? RED_LIGHT : (ans === "YES" ? WHITE : GRAY_50);
@@ -253,7 +247,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
 
     // ── General Comments ─────────────────────────────────────────────────────
     if (data.generalComments?.trim()) {
-      if (doc.y > 660) doc.addPage();
+      if (doc.y > 660) { stampFooter(); doc.addPage(); }
       doc.moveDown(0.5);
       const gcY = doc.y;
       doc.rect(50, gcY, W, 19).fill(rgb(GRAY_600));
@@ -268,6 +262,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     // RECOMMENDATIONS PAGE (only if there are NO answers)
     // ─────────────────────────────────────────────────────────────────────────
     if (noAnswers.length > 0) {
+      stampFooter();
       doc.addPage();
 
       // Header band — red
@@ -281,7 +276,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
       doc.y = 86;
 
       noAnswers.forEach((q, idx) => {
-        if (doc.y > 680) doc.addPage();
+        if (doc.y > 680) { stampFooter(); doc.addPage(); }
 
         const startY = doc.y;
         const rec    = CFR_RECOMMENDATIONS[q.id];
@@ -317,6 +312,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
 
 
 
+    stampFooter();
     doc.end();
   });
 }
