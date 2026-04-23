@@ -297,16 +297,20 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     }
 
     // ── Footer on every page ─────────────────────────────────────────────────
-    // Must call flushPages() before iterating so all pages are in the buffer
     doc.flushPages();
     const range = doc.bufferedPageRange();
+    const footerY = 742; // fixed Y, well within printable area on LETTER (792pt)
     for (let i = 0; i < range.count; i++) {
       doc.switchToPage(range.start + i);
       doc.save();
+      // Separator line
+      doc.moveTo(50, footerY - 6).lineTo(562, footerY - 6)
+        .strokeColor(rgb(GRAY_200)).lineWidth(0.5).stroke();
+      // Footer text
       doc.fillColor(rgb(GRAY_400)).fontSize(7.5).font("Helvetica")
         .text(
           `Prepared by Midwest Training and Consulting Services  ·  midwest-training.com  ·  Generated ${now}`,
-          50, doc.page.height - 28, { width: W, align: "center" }
+          50, footerY, { width: W, align: "center" }
         );
       doc.restore();
     }
