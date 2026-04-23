@@ -197,7 +197,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
       for (const q of qs) {
         const a = answerMap[q.id] || { answer: "", comments: "", photos: [] };
         const ans = a.answer.toUpperCase();
-        if (doc.y > 710) { doc.addPage(); }
+        if (doc.y > 680) { doc.addPage(); }
 
         const rowY = doc.y;
         const rowBg = ans === "NO" ? RED_LIGHT : (ans === "YES" ? WHITE : GRAY_50);
@@ -306,12 +306,12 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     const range = doc.bufferedPageRange();
     for (let i = 0; i < range.count; i++) {
       doc.switchToPage(range.start + i);
-      doc.moveTo(50, 742).lineTo(562, 742)
+      doc.moveTo(50, 710).lineTo(562, 710)
         .strokeColor(rgb(GRAY_200)).lineWidth(0.5).stroke();
       doc.fillColor(rgb(GRAY_400)).fontSize(7.5).font("Helvetica")
         .text(
           "Midwest Training and Consulting Services  \u00b7  midwest-training.com",
-          50, 748, { width: 512, align: "center", lineBreak: false }
+          50, 716, { width: 512, align: "center", lineBreak: false }
         );
     }
     // Switch back to last page so end() finalises correctly
