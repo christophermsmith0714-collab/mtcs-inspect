@@ -28,16 +28,14 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Left panel */}
-      <div className="hidden lg:flex flex-col w-[420px] bg-primary text-primary-foreground p-12 justify-between">
+      <div className="hidden lg:flex flex-col w-[420px] p-12 justify-between" style={{ background: 'linear-gradient(160deg, #1e2d5e 0%, #2a3d7a 100%)' }}>
         <div>
-          <div className="flex items-center gap-3 mb-12">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-              <ClipboardCheck className="w-6 h-6" />
-            </div>
-            <span className="font-bold text-xl">Midwest Training and Consulting Services</span>
+          {/* Logo */}
+          <div className="mb-10">
+            <img src="/mtcs-logo.jpeg" alt="Midwest Training and Consulting Services" className="w-48 rounded-xl" style={{ background: 'white', padding: '10px' }} />
           </div>
-          <h2 className="text-3xl font-bold mb-4 leading-tight">Environmental Compliance Made Simple</h2>
-          <p className="text-primary-foreground/80 text-base leading-relaxed">
+          <h2 className="text-3xl font-bold mb-4 leading-tight" style={{ color: '#ffffff' }}>Environmental Compliance Made Simple</h2>
+          <p className="text-base leading-relaxed" style={{ color: 'rgba(255,255,255,0.75)' }}>
             Monthly SPCC and stormwater inspections, documented digitally. Yes/No questions and comments — all in one place.
           </p>
         </div>
@@ -48,27 +46,27 @@ export default function LoginPage() {
             { icon: ClipboardCheck, title: "Compliance Reports", desc: "Generate professional PDF reports instantly" },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Icon className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: 'rgba(74,144,217,0.25)' }}>
+                <Icon className="w-4 h-4" style={{ color: '#4a90d9' }} />
               </div>
               <div>
-                <div className="font-semibold text-sm">{title}</div>
-                <div className="text-xs text-primary-foreground/70">{desc}</div>
+                <div className="font-semibold text-sm" style={{ color: '#ffffff' }}>{title}</div>
+                <div className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>{desc}</div>
               </div>
             </div>
           ))}
         </div>
-
       </div>
 
       {/* Right panel */}
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
-          <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
-              <ClipboardCheck className="w-5 h-5 text-primary-foreground" />
+          <div className="lg:hidden flex items-center gap-3 mb-8">
+            <img src="/mtcs-logo.jpeg" alt="MTCS" className="w-10 h-10 rounded-lg object-contain" style={{ background: 'white', padding: '2px', border: '1px solid #e2e8f0' }} />
+            <div>
+              <div className="font-bold text-sm leading-tight" style={{ color: '#1e2d5e' }}>Midwest Training &</div>
+              <div className="font-bold text-sm" style={{ color: '#4a90d9' }}>Consulting Services</div>
             </div>
-            <span className="font-bold text-lg">Midwest Training and Consulting Services</span>
           </div>
 
           <Card className="shadow-lg">

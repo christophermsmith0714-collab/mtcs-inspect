@@ -4,34 +4,34 @@
 
 @layer base {
   :root {
-    /* Environmental / industrial palette: deep forest green + warm slate */
+    /* MTCS brand palette: navy #1e2d5e + bright blue #4a90d9 */
     --background: 210 20% 96%;
-    --foreground: 210 25% 12%;
+    --foreground: 224 50% 24%;
 
     --card: 0 0% 100%;
-    --card-foreground: 210 25% 12%;
+    --card-foreground: 224 50% 24%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 210 25% 12%;
+    --popover-foreground: 224 50% 24%;
 
-    --primary: 160 60% 25%;
-    --primary-foreground: 0 0% 98%;
+    --primary: 212 62% 57%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 210 15% 90%;
-    --secondary-foreground: 210 25% 20%;
+    --secondary-foreground: 224 50% 24%;
 
     --muted: 210 15% 93%;
     --muted-foreground: 210 15% 45%;
 
-    --accent: 160 40% 88%;
-    --accent-foreground: 160 60% 20%;
+    --accent: 212 62% 92%;
+    --accent-foreground: 224 50% 24%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
 
     --border: 210 15% 85%;
     --input: 210 15% 85%;
-    --ring: 160 60% 25%;
+    --ring: 212 62% 57%;
 
     --radius: 0.5rem;
 
