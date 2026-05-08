@@ -164,7 +164,7 @@ export default function InspectionFormPage({
           questionId: q.id,
           answer: answers[q.id]?.answer ?? "",
           comments: answers[q.id]?.comments ?? "",
-          photos: answers[q.id]?.photos ?? [],
+          photos: [], // strip photos — not rendered in PDF, large base64 crashes server
         })),
         clientName: currentUser?.name ?? "",
         clientEmail: currentUser?.email ?? "",
