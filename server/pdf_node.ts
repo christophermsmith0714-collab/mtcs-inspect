@@ -108,6 +108,14 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
 
 
 
+    // Helper: stamp footer on current page (used before addPage calls)
+    const stampFooter = () => {
+      doc.moveTo(50, 710).lineTo(562, 710).strokeColor(rgb(GRAY_200)).lineWidth(0.5).stroke();
+      doc.fillColor(rgb(GRAY_400)).fontSize(7.5).font("Helvetica")
+        .text("Midwest Training and Consulting Services  \u00b7  midwest-training.com",
+          50, 716, { width: 512, align: "center", lineBreak: false });
+    };
+
     const answerMap: Record<number, Answer> = {};
     for (const a of data.answers) answerMap[a.questionId] = a;
 
@@ -184,7 +192,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     }
 
     for (const [section, qs] of Object.entries(sections)) {
-      if (doc.y > 680) { doc.addPage(); }
+      if (doc.y > 680) { stampFooter(); doc.addPage(); }
       doc.moveDown(0.4);
 
       // Section header — green pill style
@@ -197,7 +205,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
       for (const q of qs) {
         const a = answerMap[q.id] || { answer: "", comments: "", photos: [] };
         const ans = a.answer.toUpperCase();
-        if (doc.y > 680) { doc.addPage(); }
+        if (doc.y > 680) { stampFooter(); doc.addPage(); }
 
         const rowY = doc.y;
         const rowBg = ans === "NO" ? RED_LIGHT : (ans === "YES" ? WHITE : GRAY_50);
@@ -227,6 +235,40 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
             .text(`↳ ${a.comments}`, 88, doc.y, { width: W - 38 });
         }
 
+        // Photos — embed as thumbnails (max 3 per row)
+        if (a.photos && a.photos.length > 0) {
+          const thumbW = 120;
+          const thumbH = 90;
+          const thumbGap = 8;
+          const thumbsPerRow = 4;
+          let thumbX = 88;
+          let thumbY = doc.y + 4;
+
+          // Check if we need a new page for photos
+          if (thumbY + thumbH + 10 > 680) { stampFooter(); doc.addPage(); thumbY = 86; }
+
+          for (let pi = 0; pi < a.photos.length; pi++) {
+            try {
+              const photoData = a.photos[pi];
+              // Strip data URL prefix if present
+              const base64 = photoData.includes(",") ? photoData.split(",")[1] : photoData;
+              const imgBuf = Buffer.from(base64, "base64");
+              doc.image(imgBuf, thumbX, thumbY, { width: thumbW, height: thumbH, cover: [thumbW, thumbH] });
+              // Thin border around photo
+              doc.rect(thumbX, thumbY, thumbW, thumbH).stroke(rgb(GRAY_200));
+            } catch (e) {
+              // Skip unrenderable photos silently
+            }
+            thumbX += thumbW + thumbGap;
+            if ((pi + 1) % thumbsPerRow === 0) {
+              thumbX = 88;
+              thumbY += thumbH + thumbGap;
+              if (thumbY + thumbH + 10 > 680) { stampFooter(); doc.addPage(); thumbY = 86; }
+            }
+          }
+          doc.y = thumbY + thumbH + 6;
+        }
+
         // Thin separator line
         doc.moveTo(50, doc.y + 2).lineTo(562, doc.y + 2)
           .strokeColor(rgb(GRAY_200)).lineWidth(0.4).stroke();
@@ -236,7 +278,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
 
     // ── General Comments ─────────────────────────────────────────────────────
     if (data.generalComments?.trim()) {
-      if (doc.y > 660) { doc.addPage(); }
+      if (doc.y > 660) { stampFooter(); doc.addPage(); }
       doc.moveDown(0.5);
       const gcY = doc.y;
       doc.rect(50, gcY, W, 19).fill(rgb(GRAY_600));
@@ -251,6 +293,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     // RECOMMENDATIONS PAGE (only if there are NO answers)
     // ─────────────────────────────────────────────────────────────────────────
     if (noAnswers.length > 0) {
+      stampFooter();
       doc.addPage();
 
       // Header band — red
@@ -264,7 +307,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
       doc.y = 86;
 
       noAnswers.forEach((q, idx) => {
-        if (doc.y > 680) { doc.addPage(); }
+        if (doc.y > 680) { stampFooter(); doc.addPage(); }
 
         const startY = doc.y;
         const rec    = CFR_RECOMMENDATIONS[q.id];
