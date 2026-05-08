@@ -542,7 +542,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       questionId: z.number(),
       answer: z.string().max(10),
       comments: z.string().max(2000).optional(),
-      photos: z.array(z.string()).max(10).optional(),
+      photos: z.array(z.string().max(200000)).max(10).optional(), // ~150KB per photo after resize
     })).max(200),
   });
 
@@ -557,13 +557,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const safeData = validation.data;
 
       try {
-        // Strip photos from answers before PDF generation — photos are not rendered in PDF
-        // and large base64 strings can crash PDFKit or exceed memory limits
-        const pdfData = {
-          ...safeData,
-          answers: safeData.answers.map(a => ({ ...a, photos: [] })),
-        };
-        const pdfBuffer = await generatePDF(pdfData);
+        const pdfBuffer = await generatePDF(safeData);
         const base64 = pdfBuffer.toString("base64");
 
         const sendTo = safeData.sendToEmail;
