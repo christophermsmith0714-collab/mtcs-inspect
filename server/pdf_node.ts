@@ -254,8 +254,6 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
               const base64 = photoData.includes(",") ? photoData.split(",")[1] : photoData;
               const imgBuf = Buffer.from(base64, "base64");
               doc.image(imgBuf, thumbX, thumbY, { width: thumbW, height: thumbH, cover: [thumbW, thumbH] });
-              // Thin border around photo
-              doc.rect(thumbX, thumbY, thumbW, thumbH).stroke(rgb(GRAY_200));
             } catch (e) {
               // Skip unrenderable photos silently
             }
