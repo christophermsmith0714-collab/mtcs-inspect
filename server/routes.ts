@@ -476,7 +476,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.post("/api/inspections/:id/answers",
-    express.json({ limit: "20mb" }),
+    express.json({ limit: "50mb" }),
     requireAuth,
     (req, res) => {
       const id = parseInt(req.params.id);
