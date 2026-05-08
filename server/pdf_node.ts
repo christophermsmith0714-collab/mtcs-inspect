@@ -267,10 +267,11 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
           doc.y = thumbY + thumbH + 6;
         }
 
-        // Thin separator line
-        doc.moveTo(50, doc.y + 2).lineTo(562, doc.y + 2)
+        // Thin separator line — drawn after photos so it doesn't cut through them
+        doc.y += 4;
+        doc.moveTo(50, doc.y).lineTo(562, doc.y)
           .strokeColor(rgb(GRAY_200)).lineWidth(0.4).stroke();
-        doc.y += 5;
+        doc.y += 4;
       }
     }
 
