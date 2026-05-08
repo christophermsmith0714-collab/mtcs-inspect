@@ -325,6 +325,39 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.status(201).json(q);
   });
 
+  // POST /api/templates/:id/questions/bulk — import many questions at once (Excel import)
+  app.post("/api/templates/:id/questions/bulk", requireAuth, requireAdmin, (req, res) => {
+    const templateId = parseInt(req.params.id);
+    if (isNaN(templateId)) return res.status(400).json({ error: "Invalid template ID" });
+    const { questions, replace } = req.body as { questions: any[]; replace?: boolean };
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({ error: "questions array is required" });
+    }
+    // Optionally wipe existing questions first
+    if (replace) {
+      const existing = storage.getQuestionsByTemplate(templateId);
+      for (const q of existing) storage.deleteQuestion(q.id);
+    }
+    const existing = storage.getQuestionsByTemplate(templateId);
+    let nextOrder = existing.length > 0 ? Math.max(...existing.map((q: any) => q.order)) + 1 : 1;
+    const created: any[] = [];
+    for (const row of questions) {
+      const section = String(row.section || "").trim().substring(0, 200);
+      const questionText = String(row.questionText || "").trim().substring(0, 1000);
+      const recommendResponse = String(row.recommendResponse || "").trim().substring(0, 2000);
+      if (!section || !questionText) continue; // skip empty rows
+      created.push(storage.createQuestion({
+        templateId,
+        section,
+        questionText,
+        recommendResponse,
+        order: nextOrder++,
+        required: true,
+      }));
+    }
+    res.status(201).json({ imported: created.length, questions: created });
+  });
+
   // PATCH /api/questions/:id — admin edits a question
   app.patch("/api/questions/:id", requireAuth, requireAdmin, (req, res) => {
     const id = parseInt(req.params.id);
