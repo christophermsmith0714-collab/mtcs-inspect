@@ -441,7 +441,7 @@ export default function InspectionFormPage({
                               <Camera className="w-4 h-4 mb-0.5" />
                               <span className="text-xs">Photo</span>
                             </button>
-                            <input ref={el => fileInputRefs.current[q.id] = el} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={e => handlePhoto(q.id, e)} />
+                            <input ref={el => fileInputRefs.current[q.id] = el} type="file" accept="image/*" multiple className="hidden" onChange={e => handlePhoto(q.id, e)} />
                           </div>
                         </div>
                       </div>
