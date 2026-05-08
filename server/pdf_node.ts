@@ -172,7 +172,10 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
       .text(data.inspector, 450, cardY + 19, { width: 100 })
       .text(fDate, 450, cardY + 37, { width: 100 });
 
-    // ── Stats row ────────────────────────────────────────────────────────────
+    // Stats row removed per user request
+    doc.y = cardY + 72; // position below facility card
+
+    if (false) { // ── Stats row (hidden) ───────────────────────────────────────────────────────
     const statY  = cardY + 74;
     const statW  = 168;
     const statGap = 4;
@@ -191,6 +194,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     });
 
     doc.y = statY + 58;
+    } // end stats block
 
     // ── Questions by section (answered only) ────────────────────────────────
     const sections: Record<string, Question[]> = {};
