@@ -75,16 +75,33 @@ export default function InspectionFormPage({
     setAnswers(prev => ({ ...prev, [qId]: { ...(prev[qId] || { answer: "", comments: "", photos: [] }), [field]: value } }));
   };
 
-  const handlePhoto = (qId: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    Array.from(e.target.files || []).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = ev => {
-        setAnswers(prev => {
-          const cur = prev[qId] || { answer: "", comments: "", photos: [] };
-          return { ...prev, [qId]: { ...cur, photos: [...cur.photos, ev.target?.result as string] } };
-        });
+  const resizePhoto = (file: File): Promise<string> =>
+    new Promise(resolve => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        const MAX = 800;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
+          else { width = Math.round(width * MAX / height); height = MAX; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(objectUrl);
+        resolve(canvas.toDataURL("image/jpeg", 0.7));
       };
-      reader.readAsDataURL(file);
+      img.src = objectUrl;
+    });
+
+  const handlePhoto = (qId: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    Array.from(e.target.files || []).forEach(async file => {
+      const resized = await resizePhoto(file);
+      setAnswers(prev => {
+        const cur = prev[qId] || { answer: "", comments: "", photos: [] };
+        return { ...prev, [qId]: { ...cur, photos: [...cur.photos, resized] } };
+      });
     });
     e.target.value = "";
   };
