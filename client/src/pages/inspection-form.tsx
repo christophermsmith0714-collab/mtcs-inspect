@@ -80,7 +80,7 @@ export default function InspectionFormPage({
       const img = new Image();
       const objectUrl = URL.createObjectURL(file);
       img.onload = () => {
-        const MAX = 800;
+        const MAX = 600; // smaller max dimension
         let { width, height } = img;
         if (width > MAX || height > MAX) {
           if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
@@ -90,7 +90,7 @@ export default function InspectionFormPage({
         canvas.width = width; canvas.height = height;
         canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
         URL.revokeObjectURL(objectUrl);
-        resolve(canvas.toDataURL("image/jpeg", 0.7));
+        resolve(canvas.toDataURL("image/jpeg", 0.55)); // 55% quality — ~20-30KB per photo
       };
       img.src = objectUrl;
     });
@@ -191,7 +191,22 @@ export default function InspectionFormPage({
         mtcsContact: "info@midwest-training.com",
       };
 
-      const result = await apiRequest("POST", "/api/generate-pdf", payload).then(r => r.json());
+      // Use AbortController with 3-minute timeout for large reports with many photos
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 180000);
+      let result: any;
+      try {
+        const token = sessionStorage.getItem("mtcs_auth_token");
+        const r = await fetch("/api/generate-pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        result = await r.json();
+      } finally {
+        clearTimeout(timer);
+      }
 
       if (result.pdf) {
         const bytes = Uint8Array.from(atob(result.pdf), c => c.charCodeAt(0));

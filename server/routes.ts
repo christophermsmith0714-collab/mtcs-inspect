@@ -550,6 +550,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     express.json({ limit: "50mb" }),
     requireAuth,
     async (req, res) => {
+      req.setTimeout(120000); // 2 min timeout for large reports with many photos
+      res.setTimeout(120000);
       const validation = pdfSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ error: "Invalid PDF request data" });
