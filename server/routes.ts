@@ -547,7 +547,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.post("/api/generate-pdf",
-    express.json({ limit: "20mb" }),
+    express.json({ limit: "50mb" }),
     requireAuth,
     async (req, res) => {
       const validation = pdfSchema.safeParse(req.body);
@@ -557,7 +557,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const safeData = validation.data;
 
       try {
-        const pdfBuffer = await generatePDF(safeData);
+        // Strip photos from answers before PDF generation — photos are not rendered in PDF
+        // and large base64 strings can crash PDFKit or exceed memory limits
+        const pdfData = {
+          ...safeData,
+          answers: safeData.answers.map(a => ({ ...a, photos: [] })),
+        };
+        const pdfBuffer = await generatePDF(pdfData);
         const base64 = pdfBuffer.toString("base64");
 
         const sendTo = safeData.sendToEmail;
