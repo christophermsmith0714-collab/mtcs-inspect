@@ -235,43 +235,38 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
             .text(`↳ ${a.comments}`, 88, doc.y, { width: W - 38 });
         }
 
-        // Photos — embed as thumbnails (max 3 per row)
+        // Photos — 100x100 squares, up to 4 per row
         if (a.photos && a.photos.length > 0) {
-          const thumbW = 120;
-          const thumbH = 90;
-          const thumbGap = 8;
-          const thumbsPerRow = 4;
+          const SZ = 100;  // square size
+          const GAP = 6;
+          const PER_ROW = 4;
+          doc.y += 6;
           let thumbX = 88;
-          let thumbY = doc.y + 4;
+          let thumbY = doc.y;
 
-          // Check if we need a new page for photos
-          if (thumbY + thumbH + 10 > 680) { stampFooter(); doc.addPage(); thumbY = 86; }
+          if (thumbY + SZ + 16 > 680) { stampFooter(); doc.addPage(); thumbY = 86; }
 
           for (let pi = 0; pi < a.photos.length; pi++) {
             try {
-              const photoData = a.photos[pi];
-              // Strip data URL prefix if present
-              const base64 = photoData.includes(",") ? photoData.split(",")[1] : photoData;
-              const imgBuf = Buffer.from(base64, "base64");
-              doc.image(imgBuf, thumbX, thumbY, { width: thumbW, height: thumbH, cover: [thumbW, thumbH] });
-            } catch (e) {
-              // Skip unrenderable photos silently
-            }
-            thumbX += thumbW + thumbGap;
-            if ((pi + 1) % thumbsPerRow === 0) {
+              const base64 = a.photos[pi].includes(",") ? a.photos[pi].split(",")[1] : a.photos[pi];
+              doc.image(Buffer.from(base64, "base64"), thumbX, thumbY, { fit: [SZ, SZ] });
+            } catch { /* skip bad images */ }
+            thumbX += SZ + GAP;
+            if ((pi + 1) % PER_ROW === 0) {
               thumbX = 88;
-              thumbY += thumbH + thumbGap;
-              if (thumbY + thumbH + 10 > 680) { stampFooter(); doc.addPage(); thumbY = 86; }
+              thumbY += SZ + GAP;
+              if (thumbY + SZ + 16 > 680) { stampFooter(); doc.addPage(); thumbY = 86; }
             }
           }
-          doc.y = thumbY + thumbH + 6;
+          // Move cursor below last row of photos
+          const rows = Math.ceil(a.photos.length / PER_ROW);
+          doc.y = thumbY + SZ + 10;
         }
 
-        // Thin separator line — drawn after photos so it doesn't cut through them
-        doc.y += 4;
+        // Separator
         doc.moveTo(50, doc.y).lineTo(562, doc.y)
           .strokeColor(rgb(GRAY_200)).lineWidth(0.4).stroke();
-        doc.y += 4;
+        doc.y += 5;
       }
     }
 
