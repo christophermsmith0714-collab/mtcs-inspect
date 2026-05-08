@@ -520,6 +520,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ═══════════════════════════════════════════════════════════════════════════
 
   const pdfSchema = z.object({
+    inspectionName: z.string().max(300).optional(),
     facility: z.string().min(1).max(200),
     address: z.string().max(500).optional(),
     inspector: z.string().min(1).max(100),

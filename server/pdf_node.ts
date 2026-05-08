@@ -67,6 +67,7 @@ const CFR_RECOMMENDATIONS: Record<number, { cfr: string; recommendation: string 
 interface Question { id: number; questionText: string; section: string; recommendResponse?: string; }
 interface Answer   { questionId: number; answer: string; comments: string; photos: string[]; }
 interface PdfData {
+  inspectionName?: string;
   facility: string;
   address: string;
   inspector: string;
@@ -140,10 +141,16 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     // Title
     doc.fillColor(rgb(WHITE))
       .fontSize(17).font("Helvetica-Bold")
-      .text("INSPECTION REPORT", 50, 24, { width: 420 });
+      .text("INSPECTION REPORT", 50, 18, { width: 420 });
+
+    // Inspection name subtitle
+    if (data.inspectionName) {
+      doc.fillColor("rgba(255,255,255,0.85)").fontSize(9).font("Helvetica")
+        .text(data.inspectionName, 50, 40, { width: 420 });
+    }
 
     // Date top-right
-    doc.fontSize(8.5).font("Helvetica")
+    doc.fillColor(rgb(WHITE)).fontSize(8.5).font("Helvetica")
       .text(now, 420, 28, { width: 142, align: "right" });
 
     // ── Facility info card ───────────────────────────────────────────────────

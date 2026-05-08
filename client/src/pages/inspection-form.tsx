@@ -52,6 +52,7 @@ export default function InspectionFormPage({
   const [inspector, setInspector] = useState(existing?.inspectorName ?? (currentUser?.name ?? ""));
   const [date, setDate] = useState(existing?.inspectionDate ?? new Date().toISOString().split("T")[0]);
   const [generalComments, setGeneralComments] = useState(existing?.generalComments ?? "");
+  const [inspectionName, setInspectionName] = useState("");
   const [headerDone, setHeaderDone] = useState(!!existing);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -175,6 +176,7 @@ export default function InspectionFormPage({
 
       const payload = {
         facility, address, inspector, date, generalComments,
+        inspectionName: inspectionName.trim() || template?.name || "Inspection Report",
         templateName: template?.name ?? "Inspection Report",
         templateType: template?.type ?? "spcc",
         questions: questions.map(q => ({ id: q.id, questionText: q.questionText, section: q.section, recommendResponse: q.recommendResponse ?? "" })),
@@ -291,6 +293,11 @@ export default function InspectionFormPage({
                 <p className="text-sm text-muted-foreground">Fill in the facility information before starting.</p>
               </div>
               <div>
+                <Label htmlFor="inspectionName">Inspection Name *</Label>
+                <Input id="inspectionName" placeholder="e.g. KCAC Monthly SPCC - May 2026" value={inspectionName}
+                  onChange={e => setInspectionName(e.target.value)} className="mt-1" />
+              </div>
+              <div>
                 <Label htmlFor="facility">Facility Name *</Label>
                 <Input id="facility" data-testid="input-facility" placeholder="Acme Ready Mix, LLC" value={facility}
                   onChange={e => setFacility(e.target.value)} className="mt-1" />
@@ -318,7 +325,7 @@ export default function InspectionFormPage({
               <Button
                 className="w-full"
                 data-testid="button-start"
-                disabled={!facility.trim() || !inspector.trim() || !date}
+                disabled={!inspectionName.trim() || !facility.trim() || !inspector.trim() || !date}
                 onClick={() => setHeaderDone(true)}
               >
                 Start Inspection
