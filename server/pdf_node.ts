@@ -20,6 +20,7 @@ const GRAY_400    = "#9ca3af";
 const GRAY_600    = "#4b5563";
 const GRAY_900    = "#111827";
 const WHITE       = "#ffffff";
+const BLUE        = "#1d4ed8";
 
 function rgb(hex: string): [number, number, number] {
   return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
@@ -89,7 +90,6 @@ function fmtDate(d: string): string {
   catch { return d; }
 }
 
-// Draw a filled rounded-rect approximation (PDFKit rects are always square-cornered — use moveTo for rounded)
 function roundRect(doc: PDFKit.PDFDocument, x: number, y: number, w: number, h: number, r: number) {
   doc.moveTo(x + r, y)
     .lineTo(x + w - r, y).quadraticCurveTo(x + w, y, x + w, y + r)
@@ -107,9 +107,6 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     doc.on("end",  () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-
-
-    // Helper: stamp footer on current page (used before addPage calls)
     const stampFooter = () => {
       doc.moveTo(50, 710).lineTo(562, 710).strokeColor(rgb(GRAY_200)).lineWidth(0.5).stroke();
       doc.fillColor(rgb(GRAY_400)).fontSize(7.5).font("Helvetica")
@@ -120,93 +117,62 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     const answerMap: Record<number, Answer> = {};
     for (const a of data.answers) answerMap[a.questionId] = a;
 
-    // Only include answered questions in the report
     const answeredQs = data.questions.filter(q => answerMap[q.id]?.answer === "yes" || answerMap[q.id]?.answer === "no");
     const noAnswers  = data.questions.filter(q => answerMap[q.id]?.answer === "no");
-    const yesCount   = data.answers.filter(a => a.answer === "yes").length;
-    const noCount    = data.answers.filter(a => a.answer === "no").length;
-    const skippedCount = data.questions.length - answeredQs.length;
-    const totalQ     = answeredQs.length; // report only answered questions
-    const fDate      = fmtDate(data.date);
-    const now        = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-    const W          = 512; // usable width (margin 50 each side)
+
+    // Collect all questions that have photos (in answered order)
+    const questionsWithPhotos = answeredQs.filter(q => {
+      const a = answerMap[q.id];
+      return a?.photos && a.photos.length > 0;
+    });
+    const hasPhotos = questionsWithPhotos.length > 0;
+
+    const fDate = fmtDate(data.date);
+    const now   = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    const W     = 512;
 
     // ─────────────────────────────────────────────────────────────────────────
-    // PAGE 1: INSPECTION REPORT
+    // PAGE 1+: INSPECTION REPORT
     // ─────────────────────────────────────────────────────────────────────────
 
-    // ── Top header band ──────────────────────────────────────────────────────
+    // Top header band
     doc.rect(0, 0, 612, 72).fill(rgb(GREEN_DARK));
-
-    // Title
-    doc.fillColor(rgb(WHITE))
-      .fontSize(17).font("Helvetica-Bold")
+    doc.fillColor(rgb(WHITE)).fontSize(17).font("Helvetica-Bold")
       .text("INSPECTION REPORT", 50, 18, { width: 420 });
-
-    // Inspection name subtitle
     if (data.inspectionName) {
       doc.fillColor("rgba(255,255,255,0.85)").fontSize(9).font("Helvetica")
         .text(data.inspectionName, 50, 40, { width: 420 });
     }
-
-    // Date top-right
     doc.fillColor(rgb(WHITE)).fontSize(8.5).font("Helvetica")
       .text(now, 420, 28, { width: 142, align: "right" });
 
-    // ── Facility info card ───────────────────────────────────────────────────
+    // Facility card
     const cardY = 84;
     doc.rect(50, cardY, W, 62).fill(rgb(GRAY_50)).stroke(rgb(GRAY_200));
     doc.fillColor(rgb(GREEN_DARK)).fontSize(7).font("Helvetica-Bold")
       .text("FACILITY INFORMATION", 62, cardY + 8, { characterSpacing: 0.8 });
-
     doc.fillColor(rgb(GRAY_900)).fontSize(10).font("Helvetica-Bold")
       .text(data.facility, 62, cardY + 20, { width: 320 });
     doc.fontSize(8.5).font("Helvetica").fillColor(rgb(GRAY_600))
       .text(data.address || "Address not specified", 62, cardY + 34, { width: 320 });
-
-    // Right column: inspector + date
     doc.fillColor(rgb(GRAY_600)).fontSize(7.5).font("Helvetica")
-      .text("Inspector", 400, cardY + 20)
-      .text("Date", 400, cardY + 38);
+      .text("Inspector", 400, cardY + 20).text("Date", 400, cardY + 38);
     doc.fillColor(rgb(GRAY_900)).fontSize(8.5).font("Helvetica-Bold")
       .text(data.inspector, 450, cardY + 19, { width: 100 })
       .text(fDate, 450, cardY + 37, { width: 100 });
 
-    // Stats row removed per user request
-    doc.y = cardY + 72; // position below facility card
+    doc.y = cardY + 72;
 
-    if (false) { // ── Stats row (hidden) ───────────────────────────────────────────────────────
-    const statY  = cardY + 74;
-    const statW  = 168;
-    const statGap = 4;
-    const stats = [
-      { label: "TOTAL ANSWERED",    value: String(totalQ),   bg: GRAY_100,    border: GRAY_200, val: GRAY_900 },
-      { label: "COMPLIANT (YES)",   value: String(yesCount), bg: GREEN_LIGHT, border: GREEN,    val: GREEN_DARK },
-      { label: "DEFICIENCIES (NO)", value: String(noCount),  bg: noCount > 0 ? RED_LIGHT : GREEN_LIGHT, border: noCount > 0 ? RED : GREEN, val: noCount > 0 ? RED : GREEN_DARK },
-    ];
-    stats.forEach((s, i) => {
-      const x = 50 + i * (statW + statGap);
-      doc.rect(x, statY, statW, 46).fill(rgb(s.bg)).stroke(rgb(s.border));
-      doc.fontSize(22).font("Helvetica-Bold").fillColor(rgb(s.val))
-        .text(s.value, x, statY + 6, { width: statW, align: "center" });
-      doc.fontSize(6.5).font("Helvetica").fillColor(rgb(GRAY_400))
-        .text(s.label, x, statY + 32, { width: statW, align: "center", characterSpacing: 0.5 });
-    });
-
-    doc.y = statY + 58;
-    } // end stats block
-
-    // ── Questions by section (answered only) ────────────────────────────────
+    // Questions by section
     const sections: Record<string, Question[]> = {};
     for (const q of answeredQs) {
       (sections[q.section] = sections[q.section] || []).push(q);
     }
 
     for (const [section, qs] of Object.entries(sections)) {
-      if (doc.y > 680) { stampFooter(); doc.addPage(); }
+      if (doc.y > 680) { doc.addPage(); }
       doc.moveDown(0.4);
 
-      // Section header — green pill style
       const secY = doc.y;
       doc.rect(50, secY, W, 19).fill(rgb(GREEN_DARK));
       doc.fillColor(rgb(WHITE)).fontSize(8).font("Helvetica-Bold")
@@ -216,12 +182,17 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
       for (const q of qs) {
         const a = answerMap[q.id] || { answer: "", comments: "", photos: [] };
         const ans = a.answer.toUpperCase();
-        if (doc.y > 680) { stampFooter(); doc.addPage(); }
+        const hasQPhotos = a.photos && a.photos.length > 0;
+
+        // Estimate row height to check for page break
+        const noteHeight = hasQPhotos ? 12 : 0;
+        const commentHeight = a.comments?.trim() ? 12 : 0;
+        const estimatedHeight = 18 + noteHeight + commentHeight;
+        if (doc.y + estimatedHeight > 680) { doc.addPage(); }
 
         const rowY = doc.y;
-        const rowBg = ans === "NO" ? RED_LIGHT : (ans === "YES" ? WHITE : GRAY_50);
 
-        // Subtle row background for NO answers
+        // Subtle red background for NO answers
         if (ans === "NO") {
           doc.rect(50, rowY - 1, W, 16).fill(rgb(RED_LIGHT)).fillOpacity(0.4);
           doc.fillOpacity(1);
@@ -243,47 +214,25 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
         // Comment
         if (a.comments?.trim()) {
           doc.fillColor(rgb(GRAY_600)).fontSize(7.5).font("Helvetica-Oblique")
-            .text(`↳ ${a.comments}`, 88, doc.y, { width: W - 38 });
+            .text(`\u21b3 ${a.comments}`, 88, doc.y, { width: W - 38 });
         }
 
-        // Photos — 100x100 squares, up to 4 per row
-        if (a.photos && a.photos.length > 0) {
-          const SZ = 100;  // square size
-          const GAP = 6;
-          const PER_ROW = 4;
-          doc.y += 6;
-          let thumbX = 88;
-          let thumbY = doc.y;
-
-          if (thumbY + SZ + 16 > 680) { stampFooter(); doc.addPage(); thumbY = 86; }
-
-          for (let pi = 0; pi < a.photos.length; pi++) {
-            try {
-              const base64 = a.photos[pi].includes(",") ? a.photos[pi].split(",")[1] : a.photos[pi];
-              doc.image(Buffer.from(base64, "base64"), thumbX, thumbY, { fit: [SZ, SZ] });
-            } catch { /* skip bad images */ }
-            thumbX += SZ + GAP;
-            if ((pi + 1) % PER_ROW === 0) {
-              thumbX = 88;
-              thumbY += SZ + GAP;
-              if (thumbY + SZ + 16 > 680) { stampFooter(); doc.addPage(); thumbY = 86; }
-            }
-          }
-          // Move cursor below last row of photos
-          const rows = Math.ceil(a.photos.length / PER_ROW);
-          doc.y = thumbY + SZ + 10;
+        // "See photos" note instead of inline thumbnails
+        if (hasQPhotos) {
+          doc.fillColor(rgb(BLUE)).fontSize(7.5).font("Helvetica-Oblique")
+            .text(`\u21b3 See photos on attached photos page (${a.photos.length} photo${a.photos.length > 1 ? "s" : ""})`, 88, doc.y, { width: W - 38 });
         }
 
         // Separator
-        doc.moveTo(50, doc.y).lineTo(562, doc.y)
+        doc.moveTo(50, doc.y + 2).lineTo(562, doc.y + 2)
           .strokeColor(rgb(GRAY_200)).lineWidth(0.4).stroke();
-        doc.y += 5;
+        doc.y += 7;
       }
     }
 
-    // ── General Comments ─────────────────────────────────────────────────────
+    // General Comments
     if (data.generalComments?.trim()) {
-      if (doc.y > 660) { stampFooter(); doc.addPage(); }
+      if (doc.y > 660) { doc.addPage(); }
       doc.moveDown(0.5);
       const gcY = doc.y;
       doc.rect(50, gcY, W, 19).fill(rgb(GRAY_600));
@@ -295,62 +244,119 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // PHOTOS PAGE (only if any questions have photos)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (hasPhotos) {
+      doc.addPage();
+
+      // Header band — blue
+      doc.rect(0, 0, 612, 72).fill(rgb(BLUE));
+      doc.fillColor(rgb(WHITE)).fontSize(17).font("Helvetica-Bold")
+        .text("INSPECTION PHOTOS", 50, 18, { width: W });
+      doc.fontSize(9.5).font("Helvetica")
+        .text(`${questionsWithPhotos.reduce((sum, q) => sum + (answerMap[q.id]?.photos?.length || 0), 0)} photo(s)  \u00b7  ${fDate}`, 50, 40, { width: W });
+
+      doc.y = 86;
+
+      for (const q of questionsWithPhotos) {
+        const a = answerMap[q.id];
+        if (!a?.photos?.length) continue;
+
+        if (doc.y > 660) { doc.addPage(); }
+
+        // Question label
+        const labelY = doc.y;
+        const ans = a.answer.toUpperCase();
+        const pillColor = ans === "YES" ? GREEN : RED;
+        roundRect(doc, 50, labelY + 1, 32, 12, 3);
+        doc.fill(rgb(pillColor));
+        doc.fillColor(rgb(WHITE)).fontSize(7).font("Helvetica-Bold")
+          .text(ans, 50, labelY + 3, { width: 32, align: "center" });
+        doc.fillColor(rgb(GRAY_900)).fontSize(8.5).font("Helvetica-Bold")
+          .text(q.questionText, 88, labelY, { width: W - 38 });
+        doc.y = Math.max(doc.y, labelY + 14) + 4;
+
+        // Photos in a grid: 3 per row, larger size
+        const SZ  = 155;
+        const GAP = 8;
+        const PER_ROW = 3;
+        let thumbX = 50;
+        let thumbY = doc.y;
+
+        if (thumbY + SZ + 10 > 690) { doc.addPage(); thumbY = 86; }
+
+        for (let pi = 0; pi < a.photos.length; pi++) {
+          try {
+            const base64 = a.photos[pi].includes(",") ? a.photos[pi].split(",")[1] : a.photos[pi];
+            doc.image(Buffer.from(base64, "base64"), thumbX, thumbY, { fit: [SZ, SZ] });
+          } catch { /* skip bad images */ }
+
+          thumbX += SZ + GAP;
+          if ((pi + 1) % PER_ROW === 0 || pi === a.photos.length - 1) {
+            if ((pi + 1) % PER_ROW === 0) {
+              thumbX = 50;
+              thumbY += SZ + GAP;
+              if (thumbY + SZ + 10 > 690) { doc.addPage(); thumbY = 86; }
+            }
+          }
+        }
+
+        // Move cursor below last row
+        const rows = Math.ceil(a.photos.length / PER_ROW);
+        doc.y = thumbY + SZ + 16;
+
+        // Separator between question photo groups
+        doc.moveTo(50, doc.y).lineTo(562, doc.y)
+          .strokeColor(rgb(GRAY_200)).lineWidth(0.5).stroke();
+        doc.y += 10;
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // RECOMMENDATIONS PAGE (only if there are NO answers)
     // ─────────────────────────────────────────────────────────────────────────
     if (noAnswers.length > 0) {
-      stampFooter();
       doc.addPage();
 
-      // Header band — red
       doc.rect(0, 0, 612, 72).fill(rgb(RED));
-      doc.fillColor(rgb(WHITE))
-        .fontSize(17).font("Helvetica-Bold")
+      doc.fillColor(rgb(WHITE)).fontSize(17).font("Helvetica-Bold")
         .text("CORRECTIVE ACTION RECOMMENDATIONS", 50, 16, { width: W });
       doc.fontSize(9.5).font("Helvetica")
-        .text(`${noAnswers.length} deficienc${noAnswers.length === 1 ? "y" : "ies"} identified  ·  ${fDate}`, 50, 40, { width: W });
+        .text(`${noAnswers.length} deficienc${noAnswers.length === 1 ? "y" : "ies"} identified  \u00b7  ${fDate}`, 50, 40, { width: W });
 
       doc.y = 86;
 
       noAnswers.forEach((q, idx) => {
-        if (doc.y > 680) { stampFooter(); doc.addPage(); }
+        if (doc.y > 680) { doc.addPage(); }
 
         const startY = doc.y;
         const rec    = CFR_RECOMMENDATIONS[q.id];
         const recText = rec?.recommendation || q.recommendResponse || "Review applicable CFR requirements and implement corrective action.";
 
-        // Number badge
         doc.circle(65, startY + 8, 9).fill(rgb(AMBER));
         doc.fillColor(rgb(WHITE)).fontSize(8).font("Helvetica-Bold")
           .text(String(idx + 1), 57, startY + 4, { width: 16, align: "center" });
 
-        // CFR reference
         if (rec?.cfr) {
           doc.fillColor(rgb(GRAY_400)).fontSize(7.5).font("Helvetica")
             .text(rec.cfr, 82, startY + 2, { width: W - 32 });
         }
 
-        // Finding
         doc.fillColor(rgb(GRAY_900)).fontSize(9).font("Helvetica-Bold")
           .text(q.questionText, 82, startY + (rec?.cfr ? 14 : 4), { width: W - 32 });
         doc.moveDown(0.3);
 
-        // Recommendation
         doc.fillColor(rgb(GRAY_600)).fontSize(8.5).font("Helvetica")
           .text(recText, 82, doc.y, { width: W - 32 });
         doc.moveDown(0.3);
 
-        // Separator
         doc.moveTo(82, doc.y).lineTo(562, doc.y)
           .strokeColor(rgb(GRAY_200)).lineWidth(0.5).stroke();
         doc.y += 8;
       });
     }
 
-
-
     // ── Footer on every page ─────────────────────────────────────────────────
-    // MUST read bufferedPageRange BEFORE calling end() or flushPages()
-    // flushPages() resets the buffer to empty — do NOT call it first
     const range = doc.bufferedPageRange();
     for (let i = 0; i < range.count; i++) {
       doc.switchToPage(range.start + i);
@@ -362,7 +368,6 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
           50, 716, { width: 512, align: "center", lineBreak: false }
         );
     }
-    // Switch back to last page so end() finalises correctly
     if (range.count > 0) doc.switchToPage(range.start + range.count - 1);
 
     doc.end();
