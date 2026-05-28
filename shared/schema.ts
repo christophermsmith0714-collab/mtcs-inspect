@@ -66,6 +66,7 @@ export const inspections = sqliteTable("inspections", {
   inspectionDate: text("inspection_date").notNull(),
   status: text("status").notNull().default("in_progress"), // "in_progress" | "completed"
   generalComments: text("general_comments"),
+  inspectionName: text("inspection_name"),
   createdAt: text("created_at").notNull(),
   completedAt: text("completed_at"),
 });
@@ -78,6 +79,7 @@ export const insertInspectionSchema = createInsertSchema(inspections)
     inspectorName: z.string().min(1, "Inspector name is required").max(100),
     inspectionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
     generalComments: z.string().max(5000).optional().nullable(),
+    inspectionName: z.string().max(300).optional().nullable(),
     status: z.enum(["in_progress", "completed"]).default("in_progress"),
   });
 export type InsertInspection = z.infer<typeof insertInspectionSchema>;

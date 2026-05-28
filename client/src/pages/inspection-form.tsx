@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useStore } from "@/lib/store";
 import { getTemplate, type Answer, type Question } from "@/lib/data";
-import { Camera, X, CheckCircle, ChevronDown, ChevronUp, Share2, Save, ArrowLeft, FileDown, Loader2 } from "lucide-react";
+import { Camera, X, CheckCircle, ChevronDown, ChevronUp, Share2, Save, ArrowLeft, FileDown, Loader2, Pencil } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 type AnswerState = { answer: "yes" | "no" | ""; comments: string; photos: string[] };
@@ -52,7 +52,7 @@ export default function InspectionFormPage({
   const [inspector, setInspector] = useState(existing?.inspectorName ?? (currentUser?.name ?? ""));
   const [date, setDate] = useState(existing?.inspectionDate ?? new Date().toISOString().split("T")[0]);
   const [generalComments, setGeneralComments] = useState(existing?.generalComments ?? "");
-  const [inspectionName, setInspectionName] = useState("");
+  const [inspectionName, setInspectionName] = useState((existing as any)?.inspectionName ?? "");
   const [headerDone, setHeaderDone] = useState(!!existing);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -134,7 +134,8 @@ export default function InspectionFormPage({
         inspectorName: inspector,
         inspectionDate: date,
         generalComments,
-      });
+        inspectionName: inspectionName.trim() || undefined,
+      } as any);
       return inspId;
     }
     const insp = await addInspection({
@@ -146,7 +147,8 @@ export default function InspectionFormPage({
       inspectionDate: date,
       status: "in_progress",
       generalComments,
-    });
+      inspectionName: inspectionName.trim() || undefined,
+    } as any);
     setInspId(insp.id);
     return insp.id;
   };
@@ -355,14 +357,32 @@ export default function InspectionFormPage({
       <Card className="shadow-sm mb-4">
         <CardContent className="py-3 px-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="text-sm">
-              <span className="font-medium">{facility}</span>
-              {address && <span className="text-muted-foreground ml-2">· {address}</span>}
+            {/* Inspection Name — inline editable */}
+            <div className="text-sm flex items-center gap-1 group">
+              <input
+                type="text"
+                value={inspectionName}
+                onChange={e => setInspectionName(e.target.value)}
+                placeholder={facility || "Inspection name..."}
+                className="font-medium bg-transparent border-0 border-b border-transparent focus:border-primary focus:outline-none w-48 sm:w-64 text-sm py-0"
+                title="Click to edit inspection name"
+              />
+              <Pencil className="w-3 h-3 text-muted-foreground/40 group-hover:text-muted-foreground flex-shrink-0" />
             </div>
-            <div className="text-xs text-muted-foreground flex gap-3">
+            {/* Date — inline editable */}
+            <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
               <span>{inspector}</span>
               <span>·</span>
-              <span>{new Date(date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+              <div className="flex items-center gap-1 group">
+                <input
+                  type="date"
+                  value={date}
+                  onChange={e => setDate(e.target.value)}
+                  className="bg-transparent border-0 border-b border-transparent focus:border-primary focus:outline-none text-xs text-muted-foreground focus:text-foreground py-0"
+                  title="Click to change date"
+                />
+                <Pencil className="w-3 h-3 text-muted-foreground/40 group-hover:text-muted-foreground flex-shrink-0" />
+              </div>
             </div>
           </div>
         </CardContent>

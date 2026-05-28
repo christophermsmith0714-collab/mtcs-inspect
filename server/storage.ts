@@ -100,6 +100,9 @@ try {
 try {
   sqlite.exec(`ALTER TABLE inspection_questions ADD COLUMN recommend_response TEXT DEFAULT ''`);
 } catch (_) { /* already exists */ }
+try {
+  sqlite.exec(`ALTER TABLE inspections ADD COLUMN inspection_name TEXT DEFAULT NULL`);
+} catch (_) { /* already exists */ }
 
 // ── Storage Interface ────────────────────────────────────────────────────────
 export interface IStorage {
