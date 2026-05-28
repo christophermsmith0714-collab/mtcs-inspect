@@ -1,5 +1,6 @@
 import { useHashLocation } from "wouter/use-hash-location";
 import { Link } from "wouter";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -7,13 +8,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
 import { getTemplate, type Question } from "@/lib/data";
-import { ArrowLeft, Edit, CheckCircle, XCircle, MinusCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Edit, CheckCircle, XCircle, MinusCircle, Loader2, CalendarDays, Check } from "lucide-react";
 import { getQueryFn } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function InspectionDetailPage({ inspectionId }: { inspectionId: number }) {
   const [, navigate] = useHashLocation();
-  const { getInspection } = useStore();
+  const { getInspection, updateInspection } = useStore();
+  const { toast } = useToast();
   const inspection = getInspection(inspectionId);
+
+  const [editingDate, setEditingDate] = useState(false);
+  const [newDate, setNewDate]         = useState("");
+  const [savingDate, setSavingDate]   = useState(false);
 
   const templateId = inspection?.templateId ?? 1;
   const { data: questions = [], isLoading: questionsLoading } = useQuery<Question[]>({
@@ -40,13 +47,32 @@ export default function InspectionDetailPage({ inspectionId }: { inspectionId: n
     </Layout>
   );
 
-  const template = getTemplate(inspection.templateId);
-  const sections = [...new Set(questions.map((q: Question) => q.section))];
+  const template  = getTemplate(inspection.templateId);
+  const sections  = [...new Set(questions.map((q: Question) => q.section))];
   const answerMap = new Map(inspection.answers.map(a => [a.questionId, a]));
 
   const yesCount = inspection.answers.filter(a => a.answer === "yes").length;
   const noCount  = inspection.answers.filter(a => a.answer === "no").length;
   const naCount  = inspection.answers.filter(a => a.answer === "n/a").length;
+
+  const fmtDate = (d: string) =>
+    new Date(d + (d.includes("T") ? "" : "T12:00:00")).toLocaleDateString("en-US", {
+      month: "long", day: "numeric", year: "numeric",
+    });
+
+  const handleSaveDate = async () => {
+    if (!newDate) return;
+    setSavingDate(true);
+    try {
+      await updateInspection(inspectionId, { inspectionDate: newDate });
+      toast({ title: "Date updated" });
+      setEditingDate(false);
+    } catch {
+      toast({ title: "Failed to update date", variant: "destructive" });
+    } finally {
+      setSavingDate(false);
+    }
+  };
 
   return (
     <Layout title="Inspection Report">
@@ -57,10 +83,41 @@ export default function InspectionDetailPage({ inspectionId }: { inspectionId: n
           </Button>
           <h2 className="text-lg font-bold">{inspection.facilityName}</h2>
           {inspection.facilityAddress && <p className="text-sm text-muted-foreground">{inspection.facilityAddress}</p>}
+
           <div className="flex items-center gap-2 mt-1.5 flex-wrap text-sm text-muted-foreground">
             <span>{template?.name}</span>
             <span>·</span>
-            <span>{new Date(inspection.inspectionDate + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</span>
+
+            {/* Editable date */}
+            {editingDate ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={newDate}
+                  onChange={e => setNewDate(e.target.value)}
+                  className="rounded border border-input bg-background px-2 py-0.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  autoFocus
+                />
+                <Button size="sm" className="h-6 px-2 text-xs gap-1" onClick={handleSaveDate} disabled={savingDate || !newDate}>
+                  {savingDate ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                  Save
+                </Button>
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setEditingDate(false)}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setNewDate(inspection.inspectionDate); setEditingDate(true); }}
+                className="flex items-center gap-1 hover:text-foreground transition-colors group"
+                title="Click to change date"
+              >
+                <CalendarDays className="w-3.5 h-3.5" />
+                <span>{fmtDate(inspection.inspectionDate)}</span>
+                <span className="text-xs text-muted-foreground/60 group-hover:text-muted-foreground ml-0.5">(edit)</span>
+              </button>
+            )}
+
             <span>·</span>
             <span>{inspection.inspectorName}</span>
             <Badge variant="outline" className={inspection.status === "completed" ? "status-completed" : "status-in_progress"}>
