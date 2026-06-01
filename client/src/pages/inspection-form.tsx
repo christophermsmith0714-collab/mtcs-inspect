@@ -63,6 +63,16 @@ export default function InspectionFormPage({
   const [inspId, setInspId] = useState<number | null>(inspectionId);
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
+  // Edit details modal state
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [tmpName, setTmpName] = useState("");
+  const [tmpFacility, setTmpFacility] = useState("");
+  const [tmpAddress, setTmpAddress] = useState("");
+  const [tmpInspector, setTmpInspector] = useState("");
+  const [tmpDate, setTmpDate] = useState("");
+  const openDetailsModal = () => { setTmpName(inspectionName); setTmpFacility(facility); setTmpAddress(address); setTmpInspector(inspector); setTmpDate(date); setDetailsOpen(true); };
+  const saveDetails = () => { setInspectionName(tmpName); setFacility(tmpFacility); setAddress(tmpAddress); setInspector(tmpInspector); setDate(tmpDate); setDetailsOpen(false); };
+
   // Answers state
   const initAnswers: Record<number, AnswerState> = {};
   if (existing?.answers) {
@@ -356,37 +366,58 @@ export default function InspectionFormPage({
       {/* Facility info summary */}
       <Card className="shadow-sm mb-4">
         <CardContent className="py-3 px-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            {/* Inspection Name — inline editable */}
-            <div className="text-sm flex items-center gap-1 group">
-              <input
-                type="text"
-                value={inspectionName}
-                onChange={e => setInspectionName(e.target.value)}
-                placeholder={facility || "Inspection name..."}
-                className="font-medium bg-transparent border-0 border-b border-transparent focus:border-primary focus:outline-none w-48 sm:w-64 text-sm py-0"
-                title="Click to edit inspection name"
-              />
-              <Pencil className="w-3 h-3 text-muted-foreground/40 group-hover:text-muted-foreground flex-shrink-0" />
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-sm min-w-0">
+              <span className="font-medium">{inspectionName || facility || "Inspection"}</span>
+              {facility && inspectionName && <span className="text-muted-foreground ml-1.5 text-xs">· {facility}</span>}
+              {address && <span className="text-muted-foreground ml-1.5 text-xs hidden sm:inline">· {address}</span>}
             </div>
-            {/* Date — inline editable */}
-            <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-              <span>{inspector}</span>
-              <span>·</span>
-              <div className="flex items-center gap-1 group">
-                <input
-                  type="date"
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
-                  className="bg-transparent border-0 border-b border-transparent focus:border-primary focus:outline-none text-xs text-muted-foreground focus:text-foreground py-0"
-                  title="Click to change date"
-                />
-                <Pencil className="w-3 h-3 text-muted-foreground/40 group-hover:text-muted-foreground flex-shrink-0" />
-              </div>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-shrink-0">
+              <span className="hidden sm:inline">{inspector}</span>
+              <span className="hidden sm:inline">·</span>
+              <span>{new Date(date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+              <button onClick={openDetailsModal} className="flex items-center gap-1 text-primary hover:text-primary/80 font-medium ml-1">
+                <Pencil className="w-3 h-3" /> Edit
+              </button>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit details modal */}
+      {detailsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} onClick={e => { if (e.target === e.currentTarget) setDetailsOpen(false); }}>
+          <div className="bg-background rounded-xl shadow-2xl w-full max-w-sm border border-border p-5">
+            <h2 className="font-semibold text-base mb-4">Edit Inspection Details</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Inspection Name</label>
+                <input type="text" value={tmpName} onChange={e => setTmpName(e.target.value)} placeholder="e.g. KCAC Monthly SPCC - June 2026" className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Facility / Location</label>
+                <input type="text" value={tmpFacility} onChange={e => setTmpFacility(e.target.value)} placeholder="Facility name" className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Address</label>
+                <input type="text" value={tmpAddress} onChange={e => setTmpAddress(e.target.value)} placeholder="123 Main St, City, KS" className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Inspector</label>
+                <input type="text" value={tmpInspector} onChange={e => setTmpInspector(e.target.value)} placeholder="Inspector name" className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Date</label>
+                <input type="date" value={tmpDate} onChange={e => setTmpDate(e.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <Button variant="outline" className="flex-1" onClick={() => setDetailsOpen(false)}>Cancel</Button>
+              <Button className="flex-1" onClick={saveDetails}>Save</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sections */}
       <div className="space-y-3 pb-24">
