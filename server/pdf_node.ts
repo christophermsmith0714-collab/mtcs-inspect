@@ -143,8 +143,7 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
       doc.fillColor("rgba(255,255,255,0.85)").fontSize(9).font("Helvetica")
         .text(data.inspectionName, 50, 40, { width: 420 });
     }
-    doc.fillColor(rgb(WHITE)).fontSize(8.5).font("Helvetica")
-      .text(now, 420, 28, { width: 142, align: "right" });
+
 
     // Facility card
     const cardY = 84;
