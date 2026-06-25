@@ -131,8 +131,7 @@ export default function InspectionFormPage({
   const buildAnswerArray = (): Answer[] =>
     questions.map(q => {
       const a = answers[q.id] || { answer: "", comments: "", photos: [] };
-      // Strip photos before sending to server — kept in local state only, too large for server storage
-      return { questionId: q.id, answer: a.answer, comments: a.comments, photos: [] };
+      return { questionId: q.id, answer: a.answer, comments: a.comments, photos: a.photos };
     });
 
   // Returns the DB inspection ID (creates or updates in DB)
