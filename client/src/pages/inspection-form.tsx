@@ -638,12 +638,20 @@ export default function InspectionFormPage({
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           <span className="hidden sm:inline">{saving ? "Saving..." : "Save"}</span>
         </Button>
-        {pdfBlob && (
-          <Button variant="outline" onClick={() => setEmailModalOpen(true)} className="gap-2 flex-shrink-0">
-            <Share2 className="w-4 h-4" />
-            <span className="hidden sm:inline">Send Report</span>
-          </Button>
-        )}
+        <Button
+          variant="outline"
+          onClick={() => {
+            if (!pdfBlob) {
+              toast({ title: "Generate the report first", description: "Hit Generate Report, then send.", variant: "destructive" });
+              return;
+            }
+            setEmailModalOpen(true);
+          }}
+          className="gap-2 flex-shrink-0"
+        >
+          <Share2 className="w-4 h-4" />
+          <span className="hidden sm:inline">Send Report</span>
+        </Button>
         <Button onClick={handleGenerateReport} className="gap-2 flex-1" disabled={generatingPdf} data-testid="button-complete">
           {generatingPdf
             ? <><Loader2 className="w-4 h-4 animate-spin" />Generating...</>
