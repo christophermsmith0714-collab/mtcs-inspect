@@ -654,13 +654,7 @@ export default function InspectionFormPage({
         </Button>
         <Button
           variant="outline"
-          onClick={() => {
-            if (!pdfBlob) {
-              toast({ title: "Generate the report first", description: "Hit Generate Report, then send.", variant: "destructive" });
-              return;
-            }
-            setEmailModalOpen(true);
-          }}
+          onClick={() => setEmailModalOpen(true)}
           className="gap-2 flex-shrink-0"
         >
           <Share2 className="w-4 h-4" />
