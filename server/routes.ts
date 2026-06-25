@@ -563,6 +563,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     templateName: z.string().max(200),
     templateType: z.string().max(50),
     sendToEmail: z.string().max(254).optional(),
+    emailCc: z.string().max(254).optional(),
     clientName: z.string().max(150).optional(),
     clientEmail: z.string().email().max(254).optional(),
     completedAt: z.string().optional(),
@@ -611,6 +612,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const filename = `InspectionReport_${facility.replace(/\s+/g, "_")}_${inspDate}.pdf`;
 
         const sendTo = safeData.sendToEmail;
+        const sendCc = safeData.emailCc;
         const customMessage = (safeData as any).emailMessage || "";
 
         let emailSent = false;
@@ -619,6 +621,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           await resend.emails.send({
             from: "Midwest Training and Consulting Services <reports@midwest-training.com>",
             to: [sendTo],
+            cc: sendCc ? [sendCc] : undefined,
             replyTo: "reports@midwest-training.com",
             subject: `Inspection Report — ${facility} · ${dateFmt}`,
             html: `

@@ -62,6 +62,7 @@ export default function InspectionFormPage({
   const [pdfFilename, setPdfFilename] = useState("");
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [emailTo, setEmailTo] = useState("");
+  const [emailCc, setEmailCc] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
   const [lastPayload, setLastPayload] = useState<any>(null);
@@ -268,6 +269,7 @@ export default function InspectionFormPage({
     clientName: currentUser?.name ?? "",
     clientEmail: currentUser?.email ?? "",
     sendToEmail: sendTo,
+    emailCc: emailCc.trim() || undefined,
     emailMessage: message,
     completedAt: new Date().toISOString(),
     mtcsContact: "info@midwest-training.com",
@@ -296,7 +298,7 @@ export default function InspectionFormPage({
       if (result.emailSent) {
         toast({ title: "Report sent", description: `Emailed to ${emailTo}` });
         setEmailModalOpen(false);
-        setEmailTo(""); setEmailMessage("");
+        setEmailTo(""); setEmailCc(""); setEmailMessage("");
         // Also store the blob if we got one back
         if (result.pdf) {
           const bytes = Uint8Array.from(atob(result.pdf), c => c.charCodeAt(0));
@@ -618,7 +620,16 @@ export default function InspectionFormPage({
                   placeholder="client@company.com"
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   autoFocus
-                  onKeyDown={e => { if (e.key === "Enter" && emailTo.trim()) handleSendEmail(); }}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">CC (optional)</label>
+                <input
+                  type="email"
+                  value={emailCc}
+                  onChange={e => setEmailCc(e.target.value)}
+                  placeholder="cc@company.com"
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
               <div>
