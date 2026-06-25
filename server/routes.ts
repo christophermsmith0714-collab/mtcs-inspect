@@ -622,6 +622,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               user: process.env.GMAIL_USER,
               pass: process.env.GMAIL_APP_PASSWORD,
             },
+            connectionTimeout: 10000,
+            greetingTimeout: 10000,
+            socketTimeout: 15000,
           });
           await transporter.sendMail({
             from: `"Midwest Training and Consulting Services" <${process.env.GMAIL_USER}>`,
@@ -652,8 +655,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           });
           emailSent = true;
         } catch (err: any) {
-          console.error("Gmail SMTP error:", err);
-          emailError = "Email delivery failed";
+          console.error("Gmail SMTP error:", err?.message || err);
+          emailError = err?.message || "Email delivery failed";
         }
 
         res.json({ pdf: base64, emailSent, emailError: emailError || null });
