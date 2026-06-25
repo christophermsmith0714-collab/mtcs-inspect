@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useStore, type User } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { ClipboardCheck, Users, Plus, Pencil, UserX, UserCheck, Loader2 } from "lucide-react";
+import { ClipboardCheck, Users, Plus, Pencil, UserX, UserCheck, Loader2, Download, Database } from "lucide-react";
 
 type ClientForm = {
   name: string;
@@ -33,6 +33,7 @@ export default function AdminPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<ClientForm>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
 
   useEffect(() => {
     // Only fetch if store is empty AND auth is confirmed (first-ever load)
@@ -47,6 +48,29 @@ export default function AdminPage() {
       navigate("/dashboard");
     }
   }, [authReady, currentUser?.role]);
+
+  const handleBackup = async () => {
+    setBackingUp(true);
+    try {
+      const token = sessionStorage.getItem("mtcs_auth_token");
+      const res = await fetch("/api/admin/backup", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Backup failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mtcs-backup-${new Date().toISOString().split("T")[0]}.db`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Backup downloaded" });
+    } catch {
+      toast({ title: "Backup failed", variant: "destructive" });
+    } finally {
+      setBackingUp(false);
+    }
+  };
 
   const clients = users.filter(u => u.role === "client");
   const activeClients = clients.filter(u => u.subscriptionStatus === "active");
@@ -235,6 +259,31 @@ export default function AdminPage() {
           })}
         </div>
       )}
+
+      {/* Database Backup */}
+      <div className="mt-8">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Database Backup</h2>
+        <Card className="shadow-sm">
+          <CardContent className="py-4 px-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Database className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium">Download Database Backup</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Downloads a copy of all inspections, clients, and checklists. Save this somewhere safe.</div>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleBackup} disabled={backingUp} className="flex-shrink-0">
+                {backingUp
+                  ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Downloading...</>
+                  : <><Download className="w-3.5 h-3.5 mr-1.5" /> Download Backup</>}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Add / Edit Client — inline panel (no portal, works in iframe) */}
       {showModal && (

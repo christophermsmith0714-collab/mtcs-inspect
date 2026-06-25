@@ -8,6 +8,8 @@ import { storage } from "./storage";
 import { insertInspectionSchema } from "@shared/schema";
 import { requireAuth, requireAdmin } from "./middleware";
 import { generatePDF } from "./pdf_node";
+import fs from "fs";
+import path from "path";
 
 // ── Resend from env — never hardcoded ────────────────────────────────────────
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -63,7 +65,24 @@ export function registerHealthCheck(app: Express) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // ── Database backup download (admin only) ──────────────────────────────────
+  app.get("/api/admin/backup", requireAuth, requireAdmin, (_req, res) => {
+    const dbPath = process.env.DB_PATH || "/data/spcc.db";
+    if (!fs.existsSync(dbPath)) {
+      return res.status(404).json({ error: "Database file not found" });
+    }
+    const filename = `mtcs-backup-${new Date().toISOString().split("T")[0]}.db`;
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Type", "application/octet-stream");
+    const stat = fs.statSync(dbPath);
+    res.setHeader("Content-Length", stat.size);
+    fs.createReadStream(dbPath).pipe(res);
+  });
 }
+
+// Re-export to satisfy import in index.ts
+export {};
 
 // ── Helper: normalize assignedTemplates from DB → number[] ──────────────────
 function parseTemplates(raw: string | number[] | null | undefined): number[] {
