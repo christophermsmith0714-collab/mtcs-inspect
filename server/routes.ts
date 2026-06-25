@@ -616,22 +616,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         let emailSent = false;
         let emailError = "";
         if (sendTo) try {
-          const transporter = nodemailer.createTransport({
-            host: "smtp.gmail.com",
-            port: 587,
-            secure: false, // STARTTLS
-            auth: {
-              user: process.env.GMAIL_USER,
-              pass: process.env.GMAIL_APP_PASSWORD,
-            },
-            connectionTimeout: 10000,
-            greetingTimeout: 10000,
-            socketTimeout: 15000,
-          });
-          await transporter.sendMail({
-            from: `"Midwest Training and Consulting Services" <${process.env.GMAIL_USER}>`,
-            to: sendTo,
-            replyTo: process.env.GMAIL_USER,
+          await resend.emails.send({
+            from: "Midwest Training and Consulting Services <reports@midwest-training.com>",
+            to: [sendTo],
+            replyTo: "reports@midwest-training.com",
             subject: `Inspection Report — ${facility} · ${dateFmt}`,
             html: `
               <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
@@ -653,11 +641,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
                 </div>
               </div>
             `,
-            attachments: [{ filename, content: Buffer.from(base64, "base64"), contentType: "application/pdf" }],
+            attachments: [{ filename, content: base64 }],
           });
           emailSent = true;
         } catch (err: any) {
-          console.error("Gmail SMTP error:", err?.message || err);
+          console.error("Resend error:", err?.message || err);
           emailError = err?.message || "Email delivery failed";
         }
 
