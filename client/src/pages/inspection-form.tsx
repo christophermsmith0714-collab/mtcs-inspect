@@ -231,17 +231,21 @@ export default function InspectionFormPage({
         const blob = new Blob([bytes], { type: "application/pdf" });
         const filename = `InspectionReport_${facility.replace(/\s+/g, "_")}_${date}.pdf`;
 
-        // Auto-download
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url; a.download = filename;
-        document.body.appendChild(a); a.click();
-        document.body.removeChild(a); URL.revokeObjectURL(url);
-
+        // Set state first so modal renders
         setPdfBlob(blob);
         setPdfFilename(filename);
         setLastPayload(payload);
         setReportReady(true);
+
+        // Auto-download after a short delay so state updates first
+        setTimeout(() => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url; a.download = filename;
+          document.body.appendChild(a); a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }, 100);
       }
     } catch (err) {
       console.error("PDF generation failed:", err);
