@@ -3,6 +3,7 @@ import type { Express } from "express";
 import { type Server } from "http";
 import express from "express";
 import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { z } from "zod/v4";
 import { storage } from "./storage";
 import { insertInspectionSchema } from "@shared/schema";
@@ -615,10 +616,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         let emailSent = false;
         let emailError = "";
         if (sendTo) try {
-          await resend.emails.send({
-            from: "Midwest Training and Consulting Services <onboarding@resend.dev>",
-            to: [sendTo],
-            replyTo: "chris@midwest-training.com",
+          const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: {
+              user: process.env.GMAIL_USER,
+              pass: process.env.GMAIL_APP_PASSWORD,
+            },
+          });
+          await transporter.sendMail({
+            from: `"Midwest Training and Consulting Services" <${process.env.GMAIL_USER}>`,
+            to: sendTo,
+            replyTo: process.env.GMAIL_USER,
             subject: `Inspection Report — ${facility} · ${dateFmt}`,
             html: `
               <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
@@ -640,11 +648,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
                 </div>
               </div>
             `,
-            attachments: [{ filename, content: base64 }],
+            attachments: [{ filename, content: Buffer.from(base64, "base64"), contentType: "application/pdf" }],
           });
           emailSent = true;
         } catch (err: any) {
-          console.error("Resend error:", err);
+          console.error("Gmail SMTP error:", err);
           emailError = "Email delivery failed";
         }
 
