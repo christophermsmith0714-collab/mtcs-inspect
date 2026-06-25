@@ -3,7 +3,7 @@ import { useHashLocation } from "wouter/use-hash-location";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
-import { LayoutDashboard, ClipboardCheck, LogOut, Users, Menu, X, ClipboardList } from "lucide-react";
+import { LayoutDashboard, ClipboardCheck, LogOut, Users, Menu, X, ClipboardList, Settings } from "lucide-react";
 import { useState } from "react";
 
 interface LayoutProps {
@@ -24,6 +24,7 @@ export default function Layout({ children, title }: LayoutProps) {
       { href: "/admin",       label: "Clients",    icon: Users },
       { href: "/checklists",  label: "Checklists", icon: ClipboardList },
     ] : []),
+    { href: "/settings", label: "Settings", icon: Settings },
   ];
 
   const SidebarContent = () => (

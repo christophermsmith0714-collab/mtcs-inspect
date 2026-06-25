@@ -11,6 +11,7 @@ import InspectionDetailPage from "@/pages/inspection-detail";
 import AdminPage from "@/pages/admin";
 import ChecklistsPage from "@/pages/checklists";
 import ChecklistBuilderPage from "@/pages/checklist-builder";
+import SettingsPage from "@/pages/settings";
 import { Loader2 } from "lucide-react";
 
 export type AppUser = {
@@ -53,6 +54,7 @@ function AppRoutes() {
       )} />
       <Route path="/admin" component={() => <AdminPage />} />
       <Route path="/checklists" component={() => <ChecklistsPage />} />
+      <Route path="/settings" component={() => <SettingsPage />} />
       <Route path="/checklists/:id" component={({ params }) => (
         <ChecklistBuilderPage templateId={parseInt(params.id)} />
       )} />

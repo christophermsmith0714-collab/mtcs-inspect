@@ -150,6 +150,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     return res.json(safeUser(user));
   });
 
+  // POST /api/auth/change-password — any logged-in user can change their own password
+  app.post("/api/auth/change-password", requireAuth, async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: "Invalid request" });
+    }
+    const user = storage.getUser(req.authUserId!);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    const valid = await storage.verifyPassword(currentPassword, user.password);
+    if (!valid) return res.status(401).json({ error: "Current password is incorrect" });
+    await storage.updateUser(user.id, { password: newPassword });
+    return res.json({ success: true });
+  });
+
   // NOTE: /api/auth/register endpoint REMOVED — only admin can create clients
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -582,7 +596,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const pdfBuffer = await generatePDF(safeData);
         const base64 = pdfBuffer.toString("base64");
 
-        const sendTo = safeData.sendToEmail;
         const facility = safeData.facility;
         const inspDate = safeData.date;
         const inspector = safeData.inspector;
@@ -596,14 +609,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
         const filename = `InspectionReport_${facility.replace(/\s+/g, "_")}_${inspDate}.pdf`;
 
+        const sendTo = safeData.sendToEmail;
+        const customMessage = (safeData as any).emailMessage || "";
+
         let emailSent = false;
         let emailError = "";
         if (sendTo) try {
           await resend.emails.send({
             from: "Midwest Training and Consulting Services <onboarding@resend.dev>",
-            to: ["chris@midwest-training.com"],
-            replyTo: sendTo || undefined,
-            subject: `Inspection Report — ${facility} · ${dateFmt}${sendTo ? ` (for ${sendTo})` : ""}`,
+            to: [sendTo],
+            replyTo: "chris@midwest-training.com",
+            subject: `Inspection Report — ${facility} · ${dateFmt}`,
             html: `
               <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
                 <div style="background:#15803d;padding:24px 32px;border-radius:8px 8px 0 0;">
@@ -611,15 +627,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
                   <p style="color:#bbf7d0;margin:4px 0 0;">Compliance Inspection Report</p>
                 </div>
                 <div style="padding:24px 32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
+                  ${customMessage ? `<p style="color:#374151;margin-bottom:16px;">${customMessage.replace(/\n/g, "<br/>")}</p><hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;"/>` : ""}
                   <p style="color:#374151;">Please find attached the completed <strong>${templateName}</strong> for:</p>
                   <table style="width:100%;border-collapse:collapse;margin:16px 0;">
                     <tr><td style="padding:6px 0;color:#6b7280;width:130px;">Facility</td><td style="padding:6px 0;color:#111827;font-weight:600;">${facility}</td></tr>
                     <tr><td style="padding:6px 0;color:#6b7280;">Inspection Date</td><td style="padding:6px 0;color:#111827;font-weight:600;">${dateFmt}</td></tr>
                     <tr><td style="padding:6px 0;color:#6b7280;">Inspector</td><td style="padding:6px 0;color:#111827;font-weight:600;">${inspector}</td></tr>
                   </table>
-                  <p style="color:#374151;">The full inspection report with cover letter is attached as a PDF.</p>
-                  <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;" />
-                  ${sendTo ? `<p style="color:#374151;font-size:13px;"><strong>Intended recipient:</strong> ${sendTo}</p>` : ""}
+                  <p style="color:#374151;">The full inspection report is attached as a PDF.</p>
+                  <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;"/>
                   <p style="color:#6b7280;font-size:13px;">Sent by Midwest Training and Consulting Services · <a href="https://midwest-training.com" style="color:#15803d;">midwest-training.com</a></p>
                 </div>
               </div>

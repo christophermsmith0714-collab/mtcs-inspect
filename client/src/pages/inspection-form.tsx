@@ -60,6 +60,11 @@ export default function InspectionFormPage({
   const [reportReady, setReportReady] = useState(false);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [pdfFilename, setPdfFilename] = useState("");
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [lastPayload, setLastPayload] = useState<any>(null);
   const [inspId, setInspId] = useState<number | null>(inspectionId);
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
@@ -235,6 +240,7 @@ export default function InspectionFormPage({
 
         setPdfBlob(blob);
         setPdfFilename(filename);
+        setLastPayload(payload);
         setReportReady(true);
       }
     } catch (err) {
@@ -258,6 +264,37 @@ export default function InspectionFormPage({
       document.body.appendChild(a); a.click();
       document.body.removeChild(a); URL.revokeObjectURL(url);
     }
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailTo.trim() || !lastPayload) return;
+    setSendingEmail(true);
+    try {
+      const token = sessionStorage.getItem("mtcs_auth_token");
+      const r = await fetch("/api/generate-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ ...lastPayload, sendToEmail: emailTo.trim(), emailMessage: emailMessage.trim() }),
+      });
+      const result = await r.json();
+      if (result.emailSent) {
+        toast({ title: "Email sent", description: `Report sent to ${emailTo}` });
+        setEmailModalOpen(false);
+        setEmailTo(""); setEmailMessage("");
+      } else {
+        toast({ title: "Email failed", description: result.emailError || "Try again", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Email failed", variant: "destructive" });
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const handlePreviewPdf = () => {
+    if (!pdfBlob) return;
+    const url = URL.createObjectURL(pdfBlob);
+    window.open(url, "_blank");
   };
 
   const answeredCount = questions.filter(q => answers[q.id]?.answer).length;
@@ -505,7 +542,7 @@ export default function InspectionFormPage({
       </div>
 
       {/* Report ready modal */}
-      {reportReady && (
+      {reportReady && !emailModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-card rounded-xl shadow-2xl w-full max-w-sm border border-border">
             <div className="p-6">
@@ -513,15 +550,17 @@ export default function InspectionFormPage({
                 <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-3">
                   <CheckCircle className="w-7 h-7 text-green-600" />
                 </div>
-                <h2 className="font-semibold text-base">Inspection Complete!</h2>
-                <p className="text-sm text-muted-foreground mt-1">Your PDF report has been downloaded to your device.</p>
+                <h2 className="font-semibold text-base">Report Generated!</h2>
+                <p className="text-sm text-muted-foreground mt-1">PDF downloaded to your device.</p>
               </div>
               <div className="space-y-2">
-                <Button className="w-full gap-2" onClick={handleShare}>
-                  <Share2 className="w-4 h-4" /> Share / Email Report
+                <Button className="w-full gap-2" onClick={handlePreviewPdf}>
+                  <FileDown className="w-4 h-4" /> Preview PDF
+                </Button>
+                <Button variant="outline" className="w-full gap-2" onClick={() => setEmailModalOpen(true)}>
+                  <Share2 className="w-4 h-4" /> Email Report
                 </Button>
                 <Button variant="outline" className="w-full gap-2" onClick={() => {
-                  // Re-download
                   if (pdfBlob) {
                     const url = URL.createObjectURL(pdfBlob);
                     const a = document.createElement("a");
@@ -536,6 +575,50 @@ export default function InspectionFormPage({
                   Done — Go to Dashboard
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email modal */}
+      {emailModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={e => { if (e.target === e.currentTarget) setEmailModalOpen(false); }}>
+          <div className="bg-background rounded-xl shadow-2xl w-full max-w-sm border border-border p-5">
+            <h2 className="font-semibold text-base mb-4">Email Report</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Send To *</label>
+                <input
+                  type="email"
+                  value={emailTo}
+                  onChange={e => setEmailTo(e.target.value)}
+                  placeholder="client@company.com"
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Message (optional)</label>
+                <textarea
+                  value={emailMessage}
+                  onChange={e => setEmailMessage(e.target.value)}
+                  placeholder="Please find attached your inspection report..."
+                  rows={4}
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                />
+              </div>
+              <button
+                onClick={handlePreviewPdf}
+                className="w-full text-sm text-primary hover:underline text-left flex items-center gap-1"
+              >
+                <FileDown className="w-3.5 h-3.5" /> Preview PDF before sending
+              </button>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <Button variant="outline" className="flex-1" onClick={() => setEmailModalOpen(false)}>Back</Button>
+              <Button className="flex-1" onClick={handleSendEmail} disabled={sendingEmail || !emailTo.trim()}>
+                {sendingEmail ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</> : "Send"}
+              </Button>
             </div>
           </div>
         </div>
