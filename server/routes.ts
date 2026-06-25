@@ -617,7 +617,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         let emailError = "";
         if (sendTo) try {
           const transporter = nodemailer.createTransport({
-            service: "gmail",
+            host: "smtp.gmail.com",
+            port: 587,
+            secure: false, // STARTTLS
             auth: {
               user: process.env.GMAIL_USER,
               pass: process.env.GMAIL_APP_PASSWORD,
