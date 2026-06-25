@@ -190,24 +190,7 @@ export default function InspectionFormPage({
       await saveAnswers(id, allAnswers);
       await updateInspection(id, { status: "completed", completedAt: new Date().toISOString() });
 
-      const payload = {
-        facility, address, inspector, date, generalComments,
-        inspectionName: inspectionName.trim() || template?.name || "Inspection Report",
-        templateName: template?.name ?? "Inspection Report",
-        templateType: template?.type ?? "spcc",
-        questions: questions.map(q => ({ id: q.id, questionText: q.questionText, section: q.section, recommendResponse: q.recommendResponse ?? "" })),
-        answers: questions.map(q => ({
-          questionId: q.id,
-          answer: answers[q.id]?.answer ?? "",
-          comments: answers[q.id]?.comments ?? "",
-          photos: answers[q.id]?.photos ?? [], // include photos for PDF embedding
-        })),
-        clientName: currentUser?.name ?? "",
-        clientEmail: currentUser?.email ?? "",
-        sendToEmail: "",
-        completedAt: new Date().toISOString(),
-        mtcsContact: "info@midwest-training.com",
-      };
+      const payload = buildPayload();
 
       // Use AbortController with 3-minute timeout for large reports with many photos
       const controller = new AbortController();
@@ -270,21 +253,56 @@ export default function InspectionFormPage({
     }
   };
 
+  const buildPayload = (sendTo = "", message = "") => ({
+    facility, address, inspector, date, generalComments,
+    inspectionName: inspectionName.trim() || template?.name || "Inspection Report",
+    templateName: template?.name ?? "Inspection Report",
+    templateType: template?.type ?? "spcc",
+    questions: questions.map(q => ({ id: q.id, questionText: q.questionText, section: q.section, recommendResponse: q.recommendResponse ?? "" })),
+    answers: questions.map(q => ({
+      questionId: q.id,
+      answer: answers[q.id]?.answer ?? "",
+      comments: answers[q.id]?.comments ?? "",
+      photos: answers[q.id]?.photos ?? [],
+    })),
+    clientName: currentUser?.name ?? "",
+    clientEmail: currentUser?.email ?? "",
+    sendToEmail: sendTo,
+    emailMessage: message,
+    completedAt: new Date().toISOString(),
+    mtcsContact: "info@midwest-training.com",
+  });
+
   const handleSendEmail = async () => {
-    if (!emailTo.trim() || !lastPayload) return;
+    if (!emailTo.trim()) return;
     setSendingEmail(true);
     try {
+      const id = await ensureInspection();
+      await saveAnswers(id, buildAnswerArray());
+      await updateInspection(id, { status: "completed", completedAt: new Date().toISOString() });
       const token = sessionStorage.getItem("mtcs_auth_token");
-      const r = await fetch("/api/generate-pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ ...lastPayload, sendToEmail: emailTo.trim(), emailMessage: emailMessage.trim() }),
-      });
-      const result = await r.json();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 180000);
+      let result: any;
+      try {
+        const r = await fetch("/api/generate-pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify(buildPayload(emailTo.trim(), emailMessage.trim())),
+          signal: controller.signal,
+        });
+        result = await r.json();
+      } finally { clearTimeout(timer); }
       if (result.emailSent) {
-        toast({ title: "Email sent", description: `Report sent to ${emailTo}` });
+        toast({ title: "Report sent", description: `Emailed to ${emailTo}` });
         setEmailModalOpen(false);
         setEmailTo(""); setEmailMessage("");
+        // Also store the blob if we got one back
+        if (result.pdf) {
+          const bytes = Uint8Array.from(atob(result.pdf), c => c.charCodeAt(0));
+          setPdfBlob(new Blob([bytes], { type: "application/pdf" }));
+          setPdfFilename(`InspectionReport_${facility.replace(/\s+/g, "_")}_${date}.pdf`);
+        }
       } else {
         toast({ title: "Email failed", description: result.emailError || "Try again", variant: "destructive" });
       }
@@ -588,7 +606,8 @@ export default function InspectionFormPage({
       {emailModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={e => { if (e.target === e.currentTarget) setEmailModalOpen(false); }}>
           <div className="bg-background rounded-xl shadow-2xl w-full max-w-sm border border-border p-5">
-            <h2 className="font-semibold text-base mb-4">Email Report</h2>
+            <h2 className="font-semibold text-base mb-1">Send Inspection Report</h2>
+            <p className="text-xs text-muted-foreground mb-4">The PDF will be generated and emailed as an attachment.</p>
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Send To *</label>
@@ -599,6 +618,7 @@ export default function InspectionFormPage({
                   placeholder="client@company.com"
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   autoFocus
+                  onKeyDown={e => { if (e.key === "Enter" && emailTo.trim()) handleSendEmail(); }}
                 />
               </div>
               <div>
@@ -607,21 +627,15 @@ export default function InspectionFormPage({
                   value={emailMessage}
                   onChange={e => setEmailMessage(e.target.value)}
                   placeholder="Please find attached your inspection report..."
-                  rows={4}
+                  rows={3}
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 />
               </div>
-              <button
-                onClick={handlePreviewPdf}
-                className="w-full text-sm text-primary hover:underline text-left flex items-center gap-1"
-              >
-                <FileDown className="w-3.5 h-3.5" /> Preview PDF before sending
-              </button>
             </div>
             <div className="flex gap-3 mt-5">
-              <Button variant="outline" className="flex-1" onClick={() => setEmailModalOpen(false)}>Back</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setEmailModalOpen(false)} disabled={sendingEmail}>Cancel</Button>
               <Button className="flex-1" onClick={handleSendEmail} disabled={sendingEmail || !emailTo.trim()}>
-                {sendingEmail ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</> : "Send"}
+                {sendingEmail ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</> : <><Share2 className="w-4 h-4 mr-2" />Send Report</>}
               </Button>
             </div>
           </div>
