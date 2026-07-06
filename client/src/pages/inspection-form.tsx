@@ -625,10 +625,10 @@ export default function InspectionFormPage({
               <div>
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">CC (optional)</label>
                 <input
-                  type="email"
+                  type="text"
                   value={emailCc}
                   onChange={e => setEmailCc(e.target.value)}
-                  placeholder="cc@company.com"
+                  placeholder="cc@company.com, another@company.com"
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
