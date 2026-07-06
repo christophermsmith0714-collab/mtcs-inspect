@@ -625,7 +625,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             cc: sendCc ? sendCc.split(",").map(e => e.trim()).filter(e => e.length > 0) : undefined,
             replyTo: "reports@midwest-training.com",
             subject: `Inspection Report — ${facility} · ${dateFmt}`,
-            html: `
+            html: `<!DOCTYPE html><html><body>
+              <!-- ref:${Date.now()} -->
               <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
                 <div style="background:#15803d;padding:24px 32px;border-radius:8px 8px 0 0;">
                   <h1 style="color:white;margin:0;font-size:20px;">Midwest Training and Consulting Services</h1>
@@ -644,6 +645,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
                   <p style="color:#6b7280;font-size:13px;">Sent by Midwest Training and Consulting Services · <a href="https://midwest-training.com" style="color:#15803d;">midwest-training.com</a></p>
                 </div>
               </div>
+              </body></html>
             `,
             attachments: [{ filename, content: base64 }],
           });
