@@ -564,6 +564,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     templateType: z.string().max(50),
     sendToEmail: z.string().max(254).optional(),
     emailCc: z.string().max(1000).optional(),
+    emailMessage: z.string().max(2000).optional(),
     clientName: z.string().max(150).optional(),
     clientEmail: z.string().email().max(254).optional(),
     completedAt: z.string().optional(),
@@ -613,7 +614,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
         const sendTo = safeData.sendToEmail;
         const sendCc = safeData.emailCc;
-        const customMessage = (safeData as any).emailMessage || "";
+        const customMessage = safeData.emailMessage || "";
 
         let emailSent = false;
         let emailError = "";
