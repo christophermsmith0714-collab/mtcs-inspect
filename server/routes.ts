@@ -663,5 +663,228 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   );
 
+  // ── Stormwater Comprehensive Site Compliance Evaluation PDF ──────────────
+  app.post("/api/stormwater-pdf", requireAuth, async (req, res) => {
+    try {
+      const d = req.body;
+      const PDFDocument = require("pdfkit");
+      const doc = new PDFDocument({ margin: 40, size: "LETTER", bufferPages: true });
+      const chunks: Buffer[] = [];
+      doc.on("data", (c: Buffer) => chunks.push(c));
+
+      await new Promise<void>((resolve) => {
+        doc.on("end", resolve);
+
+        // ── Helpers ──────────────────────────────────────────────────────────
+        const W = doc.page.width - 80; // usable width
+        const L = 40; // left margin
+        const checkBox = (checked: boolean, x: number, y: number) => {
+          doc.rect(x, y, 9, 9).stroke();
+          if (checked) {
+            doc.moveTo(x + 1, y + 4).lineTo(x + 4, y + 8).lineTo(x + 8, y + 1).stroke();
+          }
+        };
+        const line = (y: number) => doc.moveTo(L, y).lineTo(L + W, y).strokeColor("#000").lineWidth(0.5).stroke();
+        const labelField = (label: string, value: string, y: number, labelW = 120) => {
+          doc.fontSize(9).fillColor("#000").font("Helvetica").text(label, L, y);
+          doc.moveTo(L + labelW, y + 11).lineTo(L + W, y + 11).lineWidth(0.5).stroke();
+          if (value) doc.fontSize(9).font("Helvetica").text(value, L + labelW + 2, y, { width: W - labelW - 4 });
+        };
+
+        // ── Title ─────────────────────────────────────────────────────────────
+        doc.fontSize(13).font("Helvetica-Bold").text("Stormwater Comprehensive Site Compliance Evaluation", L, 40, { align: "center", width: W });
+        doc.fontSize(9).font("Helvetica").text("Covering the period of July 1 to June 30.", L, 56, { align: "center", width: W });
+        doc.text("Submission due to KDHE by October 1 annually", L, 67, { align: "center", width: W });
+
+        let y = 85;
+        labelField("Facility Name:", d.facilityName || "", y); y += 22;
+        labelField("Kansas Permit No.:", d.kansasPermitNo || "", y); y += 22;
+        labelField("Date of Inspection:", d.dateOfInspection ? new Date(d.dateOfInspection + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "", y); y += 22;
+        labelField("Inspector's Name(s):", d.inspectorNames || "", y); y += 22;
+        labelField("Inspector's Title(s):", d.inspectorTitles || "", y); y += 26;
+
+        // ── Weather ───────────────────────────────────────────────────────────
+        doc.fontSize(9).font("Helvetica").text("Weather Information at time of Inspection", L, y, { align: "center", width: W });
+        y += 14;
+        const weatherOptions = ["Clear", "Cloudy", "Rain", "High Winds"];
+        let wx = L;
+        weatherOptions.forEach(w => {
+          checkBox((d.weather || []).includes(w), wx, y);
+          doc.fontSize(9).font("Helvetica").text(w, wx + 12, y);
+          wx += 70;
+        });
+        doc.text("Temp", wx, y);
+        doc.moveTo(wx + 28, y + 11).lineTo(wx + 80, y + 11).lineWidth(0.5).stroke();
+        if (d.temp) doc.fontSize(9).text(d.temp, wx + 30, y);
+        y += 18;
+        doc.fontSize(9).text("Other:", L, y);
+        doc.moveTo(L + 40, y + 11).lineTo(L + W, y + 11).lineWidth(0.5).stroke();
+        if (d.weatherOther) doc.fontSize(9).text(d.weatherOther, L + 42, y);
+        y += 22;
+
+        // ── Discharge questions ───────────────────────────────────────────────
+        const drawYesNo = (question: string, answer: string, qy: number) => {
+          doc.fontSize(9).font("Helvetica").text(question, L, qy, { width: W - 80 });
+          const qH = doc.heightOfString(question, { width: W - 80 });
+          checkBox(answer === "yes", L + W - 70, qy + 1);
+          doc.fontSize(9).text("Yes /", L + W - 56, qy);
+          checkBox(answer === "no", L + W - 28, qy + 1);
+          doc.fontSize(9).text("No", L + W - 14, qy);
+          return Math.max(qH, 14);
+        };
+        let qH = drawYesNo("Are there any discharges occurring at the time of inspection?", d.dischargeOccurring || "", y);
+        y += qH + 4;
+        doc.fontSize(9).text("If yes, describe:", L, y);
+        doc.moveTo(L + 90, y + 11).lineTo(L + W, y + 11).lineWidth(0.5).stroke();
+        if (d.dischargeDescribe) doc.fontSize(9).text(d.dischargeDescribe, L + 92, y, { width: W - 92 });
+        y += 20;
+        qH = drawYesNo("Is there any evidence of pollutants, in any outfall, entering the drainage system since the last inspection?", d.pollutantEvidence || "", y);
+        y += qH + 4;
+        doc.fontSize(9).text("If yes, describe:", L, y);
+        doc.moveTo(L + 90, y + 11).lineTo(L + W, y + 11).lineWidth(0.5).stroke();
+        if (d.pollutantDescribe) doc.fontSize(9).text(d.pollutantDescribe, L + 92, y, { width: W - 92 });
+        y += 24;
+
+        // ── Control Measures Table ────────────────────────────────────────────
+        const colW = [W * 0.22, W * 0.16, W * 0.12, W * 0.18, W * 0.32];
+        const colX = [L, L + colW[0], L + colW[0] + colW[1], L + colW[0] + colW[1] + colW[2], L + colW[0] + colW[1] + colW[2] + colW[3]];
+
+        // Table title
+        doc.rect(L, y, W, 14).fill("#d0d0d0").stroke();
+        doc.fontSize(9).font("Helvetica-Bold").fillColor("#000").text("Control Measures", L, y + 3, { align: "center", width: W });
+        y += 14;
+
+        // Header row
+        const headers = [
+          "Structural Control Measure\n(e.g. diversion swale, hay bales, silt fence)",
+          "Location",
+          "Control Measure is Operating Effectively?",
+          "If No, In Need of Maintenance, Repair, or Replacement?",
+          "Maintenance or Corrective Action Needed and Notes"
+        ];
+        const hH = 40;
+        headers.forEach((h, i) => {
+          doc.rect(colX[i], y, colW[i], hH).stroke();
+          doc.fontSize(7).font("Helvetica-Bold").fillColor("#000").text(h, colX[i] + 2, y + 3, { width: colW[i] - 4 });
+        });
+        y += hH;
+
+        // Data rows
+        (d.controlRows || []).forEach((row: any, idx: number) => {
+          const rowH = 36;
+          if (y + rowH > doc.page.height - 60) { doc.addPage(); y = 40; }
+          if (idx % 2 === 1) doc.rect(L, y, W, rowH).fill("#f9f9f9").stroke();
+          else doc.rect(L, y, W, rowH).stroke();
+          // Structural
+          doc.fontSize(8).font("Helvetica").fillColor("#000").text(row.structural || "", colX[0] + 2, y + 4, { width: colW[0] - 4 });
+          // Location
+          doc.text(row.location || "", colX[1] + 2, y + 4, { width: colW[1] - 4 });
+          // Operating
+          checkBox(row.operating === "yes", colX[2] + 4, y + 6); doc.fontSize(8).text("Yes", colX[2] + 15, y + 5);
+          doc.fontSize(8).text("/", colX[2] + colW[2] / 2 - 2, y + 5);
+          checkBox(row.operating === "no", colX[2] + colW[2] / 2 + 4, y + 6); doc.fontSize(8).text("No", colX[2] + colW[2] / 2 + 15, y + 5);
+          // Need
+          checkBox(row.needMaintenance, colX[3] + 4, y + 4); doc.fontSize(7).text("Maintenance", colX[3] + 15, y + 4);
+          checkBox(row.needRepair, colX[3] + 4, y + 15); doc.fontSize(7).text("Repair", colX[3] + 15, y + 14);
+          checkBox(row.needReplacement, colX[3] + 4, y + 26); doc.fontSize(7).text("Replacement", colX[3] + 15, y + 25);
+          // Notes
+          doc.fontSize(7).text(row.notes || "", colX[4] + 2, y + 4, { width: colW[4] - 4 });
+          y += rowH;
+        });
+        y += 10;
+
+        // ── Industrial Areas Table ────────────────────────────────────────────
+        if (y + 60 > doc.page.height - 60) { doc.addPage(); y = 40; }
+        const iColW = [W * 0.28, W * 0.18, W * 0.15, W * 0.39];
+        const iColX = [L, L + iColW[0], L + iColW[0] + iColW[1], L + iColW[0] + iColW[1] + iColW[2]];
+
+        doc.rect(L, y, W, 14).fill("#d0d0d0").stroke();
+        doc.fontSize(8).font("Helvetica-Bold").fillColor("#000").text("AREAS OF INDUSTRIAL MATERIALS OR ACTIVITIES EXPOSED TO STORMWATER", L, y + 3, { align: "center", width: W });
+        y += 14;
+
+        const iHeaders = ["Area/Activity", "Inspected?", "Controls Adequate\n(appropriate, effective and operating)?", "Maintenance or Corrective Action Needed and Notes"];
+        const iHH = 36;
+        iHeaders.forEach((h, i) => {
+          doc.rect(iColX[i], y, iColW[i], iHH).stroke();
+          doc.fontSize(7).font("Helvetica-Bold").fillColor("#000").text(h, iColX[i] + 2, y + 4, { width: iColW[i] - 4 });
+        });
+        y += iHH;
+
+        (d.industrialRows || []).forEach((row: any, idx: number) => {
+          const rowH = 28;
+          if (y + rowH > doc.page.height - 60) { doc.addPage(); y = 40; }
+          if (idx % 2 === 1) doc.rect(L, y, W, rowH).fill("#f9f9f9").stroke();
+          else doc.rect(L, y, W, rowH).stroke();
+          // Area
+          doc.fontSize(8).font("Helvetica").fillColor("#000").text(row.area || "", iColX[0] + 2, y + 4, { width: iColW[0] - 4 });
+          // Inspected
+          const inspY = y + 4;
+          checkBox(row.inspected === "yes", iColX[1] + 2, inspY); doc.fontSize(7).text("Yes", iColX[1] + 13, inspY);
+          checkBox(row.inspected === "no", iColX[1] + 32, inspY); doc.fontSize(7).text("No", iColX[1] + 43, inspY);
+          checkBox(row.inspected === "na", iColX[1] + 56, inspY); doc.fontSize(7).text("N/A", iColX[1] + 67, inspY);
+          // Controls adequate
+          checkBox(row.controlsAdequate === "yes", iColX[2] + 4, inspY); doc.fontSize(7).text("Yes", iColX[2] + 15, inspY);
+          checkBox(row.controlsAdequate === "no", iColX[2] + 36, inspY); doc.fontSize(7).text("No", iColX[2] + 47, inspY);
+          // Notes
+          doc.fontSize(7).text(row.notes || "", iColX[3] + 2, y + 4, { width: iColW[3] - 4 });
+          y += rowH;
+        });
+        y += 14;
+
+        // ── Non-compliance & Additional Notes ─────────────────────────────────
+        if (y + 80 > doc.page.height - 60) { doc.addPage(); y = 40; }
+        doc.fontSize(9).font("Helvetica").fillColor("#000").text("Describe any incidents of non-compliance observed and not described above:", L, y);
+        y += 13;
+        doc.rect(L, y, W, 60).stroke();
+        if (d.nonComplianceNotes) doc.fontSize(8).text(d.nonComplianceNotes, L + 3, y + 3, { width: W - 6 });
+        y += 70;
+
+        if (y + 80 > doc.page.height - 60) { doc.addPage(); y = 40; }
+        doc.fontSize(9).font("Helvetica").text("Use this space to indicate any additional notes or observations from this inspection.", L, y);
+        y += 13;
+        doc.rect(L, y, W, 60).stroke();
+        if (d.additionalNotes) doc.fontSize(8).text(d.additionalNotes, L + 3, y + 3, { width: W - 6 });
+        y += 78;
+
+        // ── Certification ─────────────────────────────────────────────────────
+        if (y + 120 > doc.page.height - 40) { doc.addPage(); y = 40; }
+        doc.fontSize(9).font("Helvetica-Bold").text("CERTIFICATION STATEMENT", L, y, { align: "center", width: W });
+        y += 14;
+        doc.fontSize(8).font("Helvetica").text(
+          "\u201CI certify under penalty of law that this document and all attachments were prepared under my direction or supervision in accordance with a system designed to assure that qualified personnel properly gathered and evaluated the information submitted. Based on my inquiry of the person or persons who manage the system, or those persons directly responsible for gathering the information, the information submitted is, to the best of my knowledge and belief, true, accurate, and complete. I am aware that there are significant penalties for submitting false information, including the possibility of fine and imprisonment for knowing violations.\u201D",
+          L, y, { width: W, align: "justify" }
+        );
+        y += 60;
+        doc.fontSize(9).text("Print Name and Title:", L, y);
+        doc.moveTo(L + 110, y + 11).lineTo(L + W * 0.6, y + 11).lineWidth(0.5).stroke();
+        if (d.printNameTitle) doc.fontSize(9).text(d.printNameTitle, L + 112, y);
+        y += 20;
+        doc.fontSize(9).text("Signature:", L, y);
+        doc.moveTo(L + 58, y + 11).lineTo(L + W * 0.55, y + 11).lineWidth(0.5).stroke();
+        doc.fontSize(9).text("Date:", L + W * 0.6, y);
+        doc.moveTo(L + W * 0.6 + 32, y + 11).lineTo(L + W, y + 11).lineWidth(0.5).stroke();
+        if (d.signatureDate) doc.fontSize(9).text(new Date(d.signatureDate + "T12:00:00").toLocaleDateString("en-US"), L + W * 0.6 + 34, y);
+
+        // ── Footer on every page ──────────────────────────────────────────────
+        const range = doc.bufferedPageRange();
+        for (let i = 0; i < range.count; i++) {
+          doc.switchToPage(range.start + i);
+          doc.fontSize(7).fillColor("#666")
+            .text("Midwest Training and Consulting Services \u00b7 midwest-training.com", L, doc.page.height - 25, { align: "center", width: W });
+        }
+        if (range.count > 0) doc.switchToPage(range.start + range.count - 1);
+
+        doc.end();
+      });
+
+      const pdfBuffer = Buffer.concat(chunks);
+      const base64 = pdfBuffer.toString("base64");
+      res.json({ pdf: base64 });
+    } catch (err: any) {
+      console.error("Stormwater PDF error:", err);
+      res.status(500).json({ error: "PDF generation failed: " + err.message });
+    }
+  });
+
   return httpServer;
 }
