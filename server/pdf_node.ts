@@ -64,7 +64,6 @@ export function generatePDF(data: PdfData): Promise<Buffer> {
   if (data.templateType === "tank") return generateTankPDF(data);
   return generateChecklistPDF({ ...data, date: reportDate(data.date) }, {
     title: data.templateName || "Inspection Checklist",
-    answeredOnly: true,
     recommendation: q => CFR_RECOMMENDATIONS[q.id] || {
       recommendation: q.recommendResponse || "Review applicable CFR requirements and implement corrective action.",
     },

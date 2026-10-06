@@ -176,6 +176,7 @@ export default function StormwaterFormPage() {
         <div className="mb-6 border-t-[3px] border-[#548dd4] pt-4">
           <h1 className="text-xl font-bold text-[#548dd4]">Stormwater Comprehensive Site Compliance Evaluation</h1>
           <p className="text-sm text-muted-foreground mt-1">Covering the period of July 1 to June 30. Submission due to KDHE by October 1 annually.</p>
+          <p className="text-sm text-muted-foreground mt-2">Unanswered questions and empty checklist sections are omitted from the PDF.</p>
         </div>
 
         {/* Facility Info */}

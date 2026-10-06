@@ -19,6 +19,7 @@ export const STORMWATER_CERTIFICATION = "\u201cI certify under penalty of law th
 export function generateStormwaterPDF(data: StormwaterPdfData): Promise<Buffer> {
   const report = new MtcsReport("Stormwater Comprehensive Site Compliance Evaluation");
   const value = (text?: string) => text?.trim() || "Not recorded";
+  const detail = (label: string, text?: string) => text?.trim() ? "\n" + label + ": " + text : "";
   report.header("Stormwater Comprehensive Site Compliance Evaluation", "MTCS  /  ANNUAL STORMWATER EVALUATION");
   report.paragraph("Covering the period of July 1 to June 30.", false, reportColors.muted);
   report.paragraph("Submission due to KDHE by October 1 annually", false, reportColors.muted);
@@ -30,14 +31,17 @@ export function generateStormwaterPDF(data: StormwaterPdfData): Promise<Buffer> 
   report.paragraph("Inspector's Name(s): " + value(data.inspectorNames));
   report.paragraph("Inspector's Title(s): " + value(data.inspectorTitles));
 
-  report.ensure(90);
-  report.section("Weather Information at Time of Inspection", 2);
-  report.paragraph("Conditions: " + (data.weather?.length ? data.weather.join(", ") : "Not recorded") + "     Temp: " + value(data.temp));
-  report.paragraph("Other: " + value(data.weatherOther));
+  if (data.weather?.length || data.temp?.trim() || data.weatherOther?.trim()) {
+    report.ensure(90);
+    report.section("Weather Information at Time of Inspection", 2);
+    if (data.weather?.length) report.paragraph("Conditions: " + data.weather.join(", "));
+    if (data.temp?.trim()) report.paragraph("Temp: " + data.temp);
+    if (data.weatherOther?.trim()) report.paragraph("Other: " + data.weatherOther);
+  }
 
   report.rows("Discharges & Pollutant Evidence", 3, [
-    { text: "Are there any discharges occurring at the time of inspection?\nIf yes, describe: " + value(data.dischargeDescribe), answer: data.dischargeOccurring, neutral: true },
-    { text: "Is there any evidence of pollutants, in any outfall, entering the drainage system since the last inspection?\nIf yes, describe: " + value(data.pollutantDescribe), answer: data.pollutantEvidence, neutral: true },
+    { text: "Are there any discharges occurring at the time of inspection?" + detail("If yes, describe", data.dischargeDescribe), answer: data.dischargeOccurring, neutral: true },
+    { text: "Is there any evidence of pollutants, in any outfall, entering the drainage system since the last inspection?" + detail("If yes, describe", data.pollutantDescribe), answer: data.pollutantEvidence, neutral: true },
   ]);
 
   report.rows("Control Measures", 4, (data.controlRows || []).map((row, index) => ({
@@ -45,20 +49,28 @@ export function generateStormwaterPDF(data: StormwaterPdfData): Promise<Buffer> 
     text: "Structural Control Measure: " + value(row.structural) + "\nLocation: " + value(row.location)
       + "\nControl Measure is Operating Effectively?"
       + "\nIf No, in need of: " + ([row.needMaintenance && "Maintenance", row.needRepair && "Repair", row.needReplacement && "Replacement"].filter(Boolean).join(", ") || "None selected")
-      + "\nMaintenance or Corrective Action Needed and Notes: " + value(row.notes),
+      + detail("Maintenance or Corrective Action Needed and Notes", row.notes),
     answer: row.operating,
   })));
 
   report.rows("Areas of Industrial Materials or Activities Exposed to Stormwater", 5,
-    (data.industrialRows || []).flatMap((row, index) => [
-      { number: index + 1, text: "Area/Activity: " + value(row.area) + "\nInspected?", answer: row.inspected, neutral: true },
-      { text: "Controls Adequate (appropriate, effective and operating)?\nMaintenance or Corrective Action Needed and Notes: " + value(row.notes), answer: row.controlsAdequate },
-    ]));
+    (data.industrialRows || []).flatMap((row, index) => {
+      const inspected = ["yes", "no", "na", "n/a"].includes(row.inspected || "");
+      const adequate = ["yes", "no"].includes(row.controlsAdequate || "");
+      const area = "Area/Activity: " + value(row.area) + "\n";
+      const notes = detail("Maintenance or Corrective Action Needed and Notes", row.notes);
+      return [
+        { number: index + 1, text: area + "Inspected?" + (adequate ? "" : notes), answer: row.inspected, neutral: true },
+        { number: inspected ? undefined : index + 1, text: (inspected ? "" : area) + "Controls Adequate (appropriate, effective and operating)?" + notes, answer: row.controlsAdequate },
+      ];
+    }));
 
-  report.ensure(100);
-  report.section("Inspection Notes", 6);
-  report.field("Describe any incidents of non-compliance observed and not described above:", data.nonComplianceNotes);
-  report.field("Use this space to indicate any additional notes or observations from this inspection.", data.additionalNotes);
+  if (data.nonComplianceNotes?.trim() || data.additionalNotes?.trim()) {
+    report.ensure(100);
+    report.section("Inspection Notes", 6);
+    if (data.nonComplianceNotes?.trim()) report.field("Describe any incidents of non-compliance observed and not described above:", data.nonComplianceNotes);
+    if (data.additionalNotes?.trim()) report.field("Use this space to indicate any additional notes or observations from this inspection.", data.additionalNotes);
+  }
 
   report.ensure(220);
   report.section("Certification Statement", 7);

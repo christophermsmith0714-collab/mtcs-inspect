@@ -6,7 +6,7 @@ Select it under **Dashboard > Start New Inspection**. Admins can edit questions 
 
 The PDF uses a distinct MTCS design: a blue brand rule, left-aligned title, numbered section bands, fine row separators and a single RESULT column with labeled YES/NO badges. Headings use the integrity report's blue (#548DD4). Green and red badges also include text so the response remains clear in grayscale. The default checklist occupies two pages; edited questions wrap and sections paginate with repeated headings.
 
-Unanswered items have an OPEN badge and the PDF is marked DRAFT. A checklist is complete when every question has a YES or NO answer; comments and photos are optional. Supporting notes and photos are appended only when entered. There are no additional tank-detail forms or corrective-action fields.
+PDFs include only answered questions. Unanswered questions, their supporting notes/photos, and sections with no answered questions are omitted. Question numbers remain tied to the saved checklist. Tank exports with incomplete answers are still marked DRAFT; a checklist is complete when every question has a YES or NO answer. Comments and photos are optional. There are no additional tank-detail forms or corrective-action fields.
 
 ## Data and deployment
 
@@ -14,7 +14,7 @@ Startup creates the tank template in a transaction if no tank template exists. F
 
 All checklist screens and PDFs now share the approved MTCS blue style, including SPCC, monthly stormwater, custom templates and the comprehensive annual stormwater evaluation. The checklist builder and saved inspection view use the same numbered section headers and response badges. Form routes retain their identity during saves and wait for inspections to load before restoring edit screens. Save failures propagate to the UI.
 
-`server/mtcs-pdf.ts` owns the shared page layout, wrapping, section headers, result badges and numbered footer. `server/checklist-pdf.ts` renders tank and monthly/custom checklists. Monthly/custom reports keep their existing YES/NO-only export selection and corrective-action recommendations; their notes and photos appear in the supporting appendix. Tank completion and draft rules are unchanged. The annual stormwater renderer preserves weather, discharge descriptions, control measures, industrial areas, notes and the certification statement with a blank signature line. Factual discharge and inspected responses use neutral blue badges; these are not compliance ratings.
+`server/mtcs-pdf.ts` owns the shared page layout, wrapping, section headers, result badges and numbered footer. `server/checklist-pdf.ts` renders tank and monthly/custom checklists using YES/NO-only export selection. Monthly/custom reports retain corrective-action recommendations; notes and photos for included questions appear in the supporting appendix. Tank completion rules are unchanged. The annual stormwater renderer includes answered discharge, control and industrial-area questions (including explicit N/A responses), entered weather/notes, and the certification statement with a blank signature line. Factual discharge and inspected responses use neutral blue badges; these are not compliance ratings. Omission affects the PDF only, not saved questions or answers.
 
 Railway's Nixpacks install step explicitly includes development dependencies so tsx and Vite are available when NODE_ENV is production. The runtime start command remains unchanged.
 

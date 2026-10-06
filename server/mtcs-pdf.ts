@@ -82,7 +82,9 @@ export class MtcsReport {
     return text.slice(0, boundary > 0 ? boundary : low);
   }
 
-  rows(title: string, number: number, rows: ReportRow[]) {
+  rows(title: string, number: number, allRows: ReportRow[]) {
+    const rows = allRows.filter(row => ["yes", "no", "na", "n/a"].includes(row.answer || ""));
+    if (!rows.length) return;
     const heading = this.sectionHeight(title, true);
     const total = heading + rows.reduce((sum, row) => sum + this.rowHeight(row.text), 0);
     this.ensure(total <= this.bottom - 36 ? total : heading + Math.min(this.rowHeight(rows[0]?.text || ""), 80));

@@ -489,7 +489,7 @@ export default function InspectionFormPage({
       )}
 
       {/* Sections */}
-      {isTankDraft && <p className="mb-4 text-sm text-muted-foreground">Choose YES or NO for each item. Unanswered items are marked OPEN in the draft PDF. Comments and photos are optional.</p>}
+      <p className="mb-4 text-sm text-muted-foreground">Only answered questions appear in the PDF. Unanswered questions and empty sections are omitted. Comments and photos are optional.</p>
       <div className="space-y-3 pb-24">
         {sections.map((section, sectionIndex) => {
           const sectionQs = questions.filter(q => q.section === section);

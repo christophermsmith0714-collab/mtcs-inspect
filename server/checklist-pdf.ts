@@ -15,21 +15,18 @@ interface ChecklistPdfOptions {
   title: string;
   eyebrow?: string;
   draft?: boolean;
-  answeredOnly?: boolean;
   recommendation?: (question: ChecklistPdfData["questions"][number]) => { cfr?: string; recommendation: string };
 }
 
 export async function generateChecklistPDF(data: ChecklistPdfData, options: ChecklistPdfOptions): Promise<Buffer> {
   const report = new MtcsReport(data.inspectionName || options.title);
   const byId = new Map(data.answers.map(a => [a.questionId, a]));
-  const questions = options.answeredOnly
-    ? data.questions.filter(q => ["yes", "no"].includes(byId.get(q.id)?.answer || ""))
-    : data.questions;
+  const questions = data.questions.filter(q => ["yes", "no"].includes(byId.get(q.id)?.answer || ""));
   report.header(options.title, options.eyebrow);
   if (data.inspectionName) report.paragraph(data.inspectionName, true);
   report.paragraph(data.facility + (data.address ? " | " + data.address : ""));
   report.paragraph("Inspector: " + data.inspector + "     Inspection date: " + data.date, false, reportColors.muted);
-  if (options.draft) report.paragraph("DRAFT - Items marked OPEN still need a YES or NO response.", true, reportColors.blue, 8);
+  if (options.draft) report.paragraph("DRAFT - Includes answered items only.", true, reportColors.blue, 8);
   report.y += 5;
 
   const sections = [...new Set(data.questions.map(q => q.section))];
