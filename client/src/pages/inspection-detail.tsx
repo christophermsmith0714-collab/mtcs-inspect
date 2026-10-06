@@ -1,3 +1,4 @@
+import { ChecklistSectionNumber, ChecklistResult, checklistSectionClass } from "@/components/checklist-style";
 import { useHashLocation } from "wouter/use-hash-location";
 import { Link } from "wouter";
 import { useState } from "react";
@@ -8,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
 import { getTemplate, type Question } from "@/lib/data";
-import { ArrowLeft, Edit, CheckCircle, XCircle, MinusCircle, Loader2, CalendarDays, Check } from "lucide-react";
+import { ArrowLeft, Edit, Loader2, CalendarDays, Check } from "lucide-react";
 import { getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -166,27 +167,25 @@ export default function InspectionDetailPage({ inspectionId }: { inspectionId: n
       )}
 
       <div className="space-y-3">
-        {sections.map(section => {
+        {sections.map((section, sectionIndex) => {
           const sectionQs = questions.filter(q => q.section === section);
           return (
             <Card key={section} className="shadow-sm overflow-hidden">
-              <div className="bg-muted/60 px-4 py-2.5 border-b border-border">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{section}</span>
+              <div className={`flex items-center gap-3 px-4 py-3 border-b border-border ${checklistSectionClass}`}>
+                <ChecklistSectionNumber number={sectionIndex + 1} />
+                <span className="text-sm font-semibold">{section}</span>
               </div>
               <div className="divide-y divide-border">
-                {sectionQs.map((q, idx) => {
+                {sectionQs.map(q => {
                   const a = answerMap.get(q.id);
                   return (
                     <div key={q.id} className="p-4">
                       <div className="flex items-start gap-2">
-                        <span className="text-xs font-bold text-muted-foreground bg-muted rounded px-1.5 py-0.5 mt-0.5 flex-shrink-0">{template?.type === "tank" ? questions.indexOf(q) + 1 : idx + 1}</span>
+                        <span className="text-xs font-bold text-muted-foreground bg-muted rounded px-1.5 py-0.5 mt-0.5 flex-shrink-0">{questions.indexOf(q) + 1}</span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm leading-relaxed mb-2">{q.questionText}</p>
                           <div className="flex items-center gap-2 flex-wrap">
-                            {a?.answer === "yes" && <span className="flex items-center gap-1 text-xs font-bold text-green-700 dark:text-green-400"><CheckCircle className="w-3.5 h-3.5" /> YES</span>}
-                            {a?.answer === "no"  && <span className="flex items-center gap-1 text-xs font-bold text-red-600 dark:text-red-400"><XCircle className="w-3.5 h-3.5" /> NO</span>}
-                            {a?.answer === "n/a" && <span className="flex items-center gap-1 text-xs font-bold text-muted-foreground"><MinusCircle className="w-3.5 h-3.5" /> N/A</span>}
-                            {!a?.answer && <span className="text-xs text-muted-foreground italic">Not answered</span>}
+                            <ChecklistResult answer={a?.answer} />
                             {a?.comments && <span className="text-xs text-muted-foreground">— {a.comments}</span>}
                           </div>
                           {a?.photos && a.photos.length > 0 && (

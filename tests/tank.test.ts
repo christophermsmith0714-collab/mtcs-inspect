@@ -109,8 +109,8 @@ describe("Tank checklist persistence and access", () => {
     expect(completed.status).toBe(200);
     expect(completed.body.status).toBe("completed");
   });
-  it("exports tank and existing custom reports through the authenticated endpoint", async () => {
-    for (const type of ["tank", "custom"]) {
+  it("exports tank, SPCC, stormwater and custom reports through the authenticated endpoint", async () => {
+    for (const type of ["tank", "spcc", "stormwater", "custom"]) {
       const response = await request(app).post("/api/generate-pdf").set("Authorization", `Bearer ${token}`).send({
         facility: "Example facility", inspector: "Test inspector", date: "2026-10-06",
         templateName: "Example checklist", templateType: type, questions,
@@ -120,6 +120,19 @@ describe("Tank checklist persistence and access", () => {
       expect(Buffer.from(response.body.pdf, "base64").subarray(0, 5).toString()).toBe("%PDF-");
       expect(response.body.emailSent).toBe(false);
     }
+  });
+  it("generates the annual stormwater PDF only for authenticated users", async () => {
+    const payload = {
+      facilityName: "Example annual evaluation", dateOfInspection: "2026-10-06",
+      weather: ["Clear"], dischargeOccurring: "no", pollutantEvidence: "no",
+      controlRows: [{ structural: "Swale", location: "North", operating: "no", needRepair: true, notes: "Repair note" }],
+      industrialRows: [{ area: "Loading area", inspected: "na", controlsAdequate: "", notes: "Not applicable" }],
+      additionalNotes: "Long note. ".repeat(500),
+    };
+    expect((await request(app).post("/api/stormwater-pdf").send(payload)).status).toBe(401);
+    const result = await request(app).post("/api/stormwater-pdf").set("Authorization", `Bearer ${token}`).send(payload);
+    expect(result.status).toBe(200);
+    expect(Buffer.from(result.body.pdf, "base64").subarray(0, 5).toString()).toBe("%PDF-");
   });
   it("returns a completed checklist to draft when answers change", async () => {
     const result = await request(app).post(`/api/inspections/${inspectionId}/answers`).set("Authorization", `Bearer ${token}`).send({
