@@ -1,3 +1,4 @@
+import { ChecklistSectionNumber, checklistSectionButtonClass, checklistAnswerClass } from "@/components/checklist-style";
 import { useState, useRef } from "react";
 import { useHashLocation } from "wouter/use-hash-location";
 import { useQuery } from "@tanstack/react-query";
@@ -499,9 +500,9 @@ export default function InspectionFormPage({
           return (
             <Card key={section} className="shadow-sm overflow-hidden">
               <button type="button" onClick={() => toggleSection(section)}
-                className={`w-full flex items-center justify-between px-4 py-3 transition-colors border-b border-border ${isTank ? "bg-blue-50/80 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-950/50" : "bg-muted/60 hover:bg-muted"}`}>
+                className={`w-full flex items-center justify-between px-4 py-3 transition-colors border-b border-border ${checklistSectionButtonClass}`}>
                 <div className="flex items-center gap-2">
-                  {isTank && <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#548dd4] text-xs font-bold text-white">{String(sectionIndex + 1).padStart(2, "0")}</span>}
+                  <ChecklistSectionNumber number={sectionIndex + 1} />
                   {allDone && <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />}
                   <span className="font-semibold text-sm">{section}</span>
                   <Badge variant="outline" className="text-xs">{sectionAnswered}/{sectionQs.length}</Badge>
@@ -511,12 +512,12 @@ export default function InspectionFormPage({
 
               {!collapsed && (
                 <div className="divide-y divide-border">
-                  {sectionQs.map((q, idx) => {
+                  {sectionQs.map(q => {
                     const a = answers[q.id] || { answer: "", comments: "", photos: [] };
                     return (
                       <div key={q.id} className="p-4" data-testid={`question-${q.id}`}>
                         <div className="flex items-start gap-2 mb-3">
-                          <span className="text-xs font-bold text-muted-foreground bg-muted rounded px-1.5 py-0.5 mt-0.5 flex-shrink-0">{isTank ? questions.indexOf(q) + 1 : idx + 1}</span>
+                          <span className="text-xs font-bold text-muted-foreground bg-muted rounded px-1.5 py-0.5 mt-0.5 flex-shrink-0">{questions.indexOf(q) + 1}</span>
                           <p className="text-sm leading-relaxed">{q.questionText}</p>
                         </div>
 
@@ -527,10 +528,9 @@ export default function InspectionFormPage({
                               data-testid={`answer-${q.id}-${opt}`}
                               aria-pressed={a.answer === opt}
                               onClick={() => setAnswer(q.id, "answer", answers[q.id]?.answer === opt ? "" : opt)}
-                              className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border ${
+                              className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all border ${
                                 a.answer === opt
-                                  ? opt === "yes" ? "bg-green-600 text-white border-green-600"
-                                  : "bg-red-600 text-white border-red-600"
+                                  ? checklistAnswerClass(opt)
                                   : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary"
                               }`}>
                               {opt}

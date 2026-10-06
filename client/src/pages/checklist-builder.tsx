@@ -1,3 +1,4 @@
+import { ChecklistSectionNumber, checklistSectionButtonClass } from "@/components/checklist-style";
 import { useState, useEffect } from "react";
 import { useHashLocation } from "wouter/use-hash-location";
 import Layout from "@/components/layout";
@@ -368,7 +369,7 @@ export default function ChecklistBuilderPage({ templateId }: { templateId: numbe
         </Card>
       ) : (
         <div className="space-y-3 pb-8">
-          {sections.map(section => {
+          {sections.map((section, sectionIndex) => {
             const sectionQs = questions.filter(q => q.section === section);
             const collapsed = collapsedSections.has(section);
             return (
@@ -376,9 +377,10 @@ export default function ChecklistBuilderPage({ templateId }: { templateId: numbe
                 <button
                   type="button"
                   onClick={() => toggleSection(section)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-muted/60 hover:bg-muted transition-colors border-b border-border"
+                  className={`w-full flex items-center justify-between px-4 py-3 transition-colors border-b border-border ${checklistSectionButtonClass}`}
                 >
                   <div className="flex items-center gap-2">
+                    <ChecklistSectionNumber number={sectionIndex + 1} />
                     <span className="font-semibold text-sm">{section}</span>
                     <Badge variant="outline" className="text-xs">{sectionQs.length}</Badge>
                   </div>
@@ -387,7 +389,7 @@ export default function ChecklistBuilderPage({ templateId }: { templateId: numbe
 
                 {!collapsed && (
                   <div className="divide-y divide-border">
-                    {sectionQs.map((q, idx) => (
+                    {sectionQs.map(q => (
                       <div key={q.id} className="p-4">
                         {editingQId === q.id ? (
                           /* ── Inline edit form ── */
@@ -419,7 +421,7 @@ export default function ChecklistBuilderPage({ templateId }: { templateId: numbe
                           /* ── Read view ── */
                           <div className="flex items-start gap-2">
                             <GripVertical className="w-4 h-4 text-muted-foreground/40 mt-0.5 flex-shrink-0" />
-                            <span className="text-xs font-bold text-muted-foreground bg-muted rounded px-1.5 py-0.5 mt-0.5 flex-shrink-0">{idx + 1}</span>
+                            <span className="text-xs font-bold text-muted-foreground bg-muted rounded px-1.5 py-0.5 mt-0.5 flex-shrink-0">{questions.indexOf(q) + 1}</span>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm leading-relaxed">{q.questionText}</p>
                               {q.recommendResponse && (

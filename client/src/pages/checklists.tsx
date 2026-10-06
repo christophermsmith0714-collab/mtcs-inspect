@@ -155,13 +155,13 @@ export default function ChecklistsPage() {
           {templates.map(t => (
             <Card
               key={t.id}
-              className="shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+              className="shadow-sm hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-[#548dd4]"
               onClick={() => navigate(`/checklists/${t.id}`)}
             >
               <CardContent className="py-3 px-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <ClipboardList className="w-5 h-5 text-primary" />
+                  <div className="w-9 h-9 rounded-lg bg-[#eef4fc] flex items-center justify-center flex-shrink-0">
+                    <ClipboardList className="w-5 h-5 text-[#548dd4]" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">

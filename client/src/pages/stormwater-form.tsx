@@ -1,3 +1,4 @@
+import { ChecklistHeading, checklistAnswerClass } from "@/components/checklist-style";
 import { useState } from "react";
 import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -165,20 +166,21 @@ export default function StormwaterFormPage() {
     }
   }
 
-  const inputCls = "w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
-  const labelCls = "block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide";
+  const inputCls = "w-full bg-background border border-border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400";
+  const labelCls = "block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide";
 
   return (
     <Layout title="Stormwater Evaluation">
       <div className="max-w-4xl mx-auto p-4 pb-24">
         {/* Header */}
-        <div className="text-center mb-6">
-          <h1 className="text-xl font-bold text-gray-900">Stormwater Comprehensive Site Compliance Evaluation</h1>
-          <p className="text-sm text-gray-500 mt-1">Covering the period of July 1 to June 30. Submission due to KDHE by October 1 annually.</p>
+        <div className="mb-6 border-t-[3px] border-[#548dd4] pt-4">
+          <h1 className="text-xl font-bold text-[#548dd4]">Stormwater Comprehensive Site Compliance Evaluation</h1>
+          <p className="text-sm text-muted-foreground mt-1">Covering the period of July 1 to June 30. Submission due to KDHE by October 1 annually.</p>
         </div>
 
         {/* Facility Info */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4 space-y-3">
+        <div className="bg-card rounded-lg border border-blue-100 dark:border-border shadow-sm p-4 mb-4 space-y-3">
+          <ChecklistHeading number={1}>Facility Information</ChecklistHeading>
           <div>
             <label className={labelCls}>Facility Name</label>
             <input className={inputCls} value={facilityName} onChange={e => setFacilityName(e.target.value)} placeholder="Enter facility name" />
@@ -204,37 +206,38 @@ export default function StormwaterFormPage() {
         </div>
 
         {/* Weather */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">Weather Information at Time of Inspection</h2>
+        <div className="bg-card rounded-lg border border-blue-100 dark:border-border shadow-sm p-4 mb-4">
+          <ChecklistHeading number={2}>Weather Information at Time of Inspection</ChecklistHeading>
           <div className="flex flex-wrap gap-4 mb-3">
             {WEATHER_OPTIONS.map(w => (
               <label key={w} className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={weather.includes(w)} onChange={() => toggleWeather(w)}
-                  className="w-4 h-4 rounded border-gray-300" />
+                  className="accent-[#548dd4] w-4 h-4 rounded border-border" />
                 {w}
               </label>
             ))}
             <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-600">Temp:</span>
-              <input className="border border-gray-300 rounded px-2 py-1 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              <span className="text-muted-foreground">Temp:</span>
+              <input className="border border-border rounded px-2 py-1 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 value={temp} onChange={e => setTemp(e.target.value)} placeholder="°F" />
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Other:</span>
+            <span className="text-sm text-muted-foreground">Other:</span>
             <input className={inputCls} value={weatherOther} onChange={e => setWeatherOther(e.target.value)} placeholder="Describe other conditions" />
           </div>
         </div>
 
         {/* Discharge Questions */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4 space-y-4">
+        <div className="bg-card rounded-lg border border-blue-100 dark:border-border shadow-sm p-4 mb-4 space-y-4">
+          <ChecklistHeading number={3}>Discharges &amp; Pollutant Evidence</ChecklistHeading>
           <div>
-            <div className="flex items-start justify-between gap-4">
-              <p className="text-sm text-gray-800">Are there any discharges occurring at the time of inspection?</p>
+            <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+              <p className="text-sm text-foreground">Are there any discharges occurring at the time of inspection?</p>
               <div className="flex gap-3 shrink-0">
                 {(["yes", "no"] as const).map(v => (
-                  <label key={v} className="flex items-center gap-1.5 text-sm cursor-pointer">
-                    <input type="radio" name="discharge" checked={dischargeOccurring === v} onChange={() => setDischargeOccurring(v)} className="w-4 h-4" />
+                  <label key={v} className={`flex items-center gap-1.5 text-sm cursor-pointer rounded-full border px-2 py-1 ${dischargeOccurring === v ? checklistAnswerClass(v, true) : "border-border"}`}>
+                    <input type="radio" name="discharge" checked={dischargeOccurring === v} onChange={() => setDischargeOccurring(v)} className="accent-[#548dd4] w-4 h-4" />
                     {v === "yes" ? "Yes" : "No"}
                   </label>
                 ))}
@@ -248,12 +251,12 @@ export default function StormwaterFormPage() {
             )}
           </div>
           <div>
-            <div className="flex items-start justify-between gap-4">
-              <p className="text-sm text-gray-800">Is there any evidence of pollutants, in any outfall, entering the drainage system since the last inspection?</p>
+            <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+              <p className="text-sm text-foreground">Is there any evidence of pollutants, in any outfall, entering the drainage system since the last inspection?</p>
               <div className="flex gap-3 shrink-0">
                 {(["yes", "no"] as const).map(v => (
-                  <label key={v} className="flex items-center gap-1.5 text-sm cursor-pointer">
-                    <input type="radio" name="pollutant" checked={pollutantEvidence === v} onChange={() => setPollutantEvidence(v)} className="w-4 h-4" />
+                  <label key={v} className={`flex items-center gap-1.5 text-sm cursor-pointer rounded-full border px-2 py-1 ${pollutantEvidence === v ? checklistAnswerClass(v, true) : "border-border"}`}>
+                    <input type="radio" name="pollutant" checked={pollutantEvidence === v} onChange={() => setPollutantEvidence(v)} className="accent-[#548dd4] w-4 h-4" />
                     {v === "yes" ? "Yes" : "No"}
                   </label>
                 ))}
@@ -269,65 +272,65 @@ export default function StormwaterFormPage() {
         </div>
 
         {/* Control Measures Table */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+        <div className="bg-card rounded-lg border border-blue-100 dark:border-border shadow-sm p-4 mb-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Control Measures</h2>
+            <ChecklistHeading number={4}>Control Measures</ChecklistHeading>
             <Button size="sm" variant="outline" onClick={addControlRow} className="text-xs gap-1">
-              <Plus className="w-3 h-3" /> Add Row
+              <Plus className="accent-[#548dd4] w-3 h-3" /> Add Row
             </Button>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse">
+            <table className="w-full min-w-[780px] text-xs border-collapse">
               <thead>
-                <tr className="bg-gray-100">
-                  <th className="border border-gray-300 px-2 py-2 text-left font-semibold w-1/5">Structural Control Measure<br/><span className="font-normal text-gray-500">(e.g. diversion swale, hay bales, silt fence)</span></th>
-                  <th className="border border-gray-300 px-2 py-2 text-left font-semibold w-1/6">Location</th>
-                  <th className="border border-gray-300 px-2 py-2 text-center font-semibold w-24">Control Measure Operating Effectively?</th>
-                  <th className="border border-gray-300 px-2 py-2 text-center font-semibold w-32">If No, In Need of Maintenance, Repair, or Replacement?</th>
-                  <th className="border border-gray-300 px-2 py-2 text-left font-semibold">Maintenance or Corrective Action Needed and Notes</th>
-                  <th className="border border-gray-300 px-2 py-2 w-8"></th>
+                <tr className="bg-[#eef4fc] dark:bg-blue-950/30">
+                  <th className="border border-border px-2 py-2 text-left font-semibold w-1/5">Structural Control Measure<br/><span className="font-normal text-muted-foreground">(e.g. diversion swale, hay bales, silt fence)</span></th>
+                  <th className="border border-border px-2 py-2 text-left font-semibold w-1/6">Location</th>
+                  <th className="border border-border px-2 py-2 text-center font-semibold w-24">Control Measure Operating Effectively?</th>
+                  <th className="border border-border px-2 py-2 text-center font-semibold w-32">If No, In Need of Maintenance, Repair, or Replacement?</th>
+                  <th className="border border-border px-2 py-2 text-left font-semibold">Maintenance or Corrective Action Needed and Notes</th>
+                  <th className="border border-border px-2 py-2 w-8"></th>
                 </tr>
               </thead>
               <tbody>
                 {controlRows.map((row, idx) => (
-                  <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                    <td className="border border-gray-300 px-2 py-1">
+                  <tr key={row.id} className={idx % 2 === 0 ? "bg-card" : "bg-blue-50/40 dark:bg-blue-950/10"}>
+                    <td className="border border-border px-2 py-1">
                       <input className="w-full text-xs focus:outline-none bg-transparent" value={row.structural}
                         onChange={e => updateControlRow(row.id, "structural", e.target.value)} placeholder="Type of control..." />
                     </td>
-                    <td className="border border-gray-300 px-2 py-1">
+                    <td className="border border-border px-2 py-1">
                       <input className="w-full text-xs focus:outline-none bg-transparent" value={row.location}
                         onChange={e => updateControlRow(row.id, "location", e.target.value)} placeholder="Location..." />
                     </td>
-                    <td className="border border-gray-300 px-2 py-2 text-center">
+                    <td className="border border-border px-2 py-2 text-center">
                       <div className="flex justify-center gap-3">
                         {(["yes", "no"] as const).map(v => (
-                          <label key={v} className="flex items-center gap-1 cursor-pointer">
+                          <label key={v} className={`flex items-center gap-1 cursor-pointer rounded-full border px-2 py-1 ${row.operating === v ? checklistAnswerClass(v, false) : "border-border"}`}>
                             <input type="radio" name={`operating-${row.id}`} checked={row.operating === v}
-                              onChange={() => updateControlRow(row.id, "operating", v)} className="w-3 h-3" />
+                              onChange={() => updateControlRow(row.id, "operating", v)} className="accent-[#548dd4] w-3 h-3" />
                             <span>{v === "yes" ? "Yes" : "No"}</span>
                           </label>
                         ))}
                       </div>
                     </td>
-                    <td className="border border-gray-300 px-2 py-2">
+                    <td className="border border-border px-2 py-2">
                       <div className="space-y-1">
                         {(["needMaintenance", "needRepair", "needReplacement"] as const).map(field => (
                           <label key={field} className="flex items-center gap-1 cursor-pointer">
-                            <input type="checkbox" checked={row[field]} onChange={e => updateControlRow(row.id, field, e.target.checked)} className="w-3 h-3" />
+                            <input type="checkbox" checked={row[field]} onChange={e => updateControlRow(row.id, field, e.target.checked)} className="accent-[#548dd4] w-3 h-3" />
                             <span>{field === "needMaintenance" ? "Maintenance" : field === "needRepair" ? "Repair" : "Replacement"}</span>
                           </label>
                         ))}
                       </div>
                     </td>
-                    <td className="border border-gray-300 px-2 py-1">
+                    <td className="border border-border px-2 py-1">
                       <textarea className="w-full text-xs focus:outline-none bg-transparent resize-none" rows={2} value={row.notes}
                         onChange={e => updateControlRow(row.id, "notes", e.target.value)} placeholder="Notes..." />
                     </td>
-                    <td className="border border-gray-300 px-1 py-1 text-center">
+                    <td className="border border-border px-1 py-1 text-center">
                       {controlRows.length > 1 && (
                         <button onClick={() => removeControlRow(row.id)} className="text-red-400 hover:text-red-600">
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2 className="accent-[#548dd4] w-3 h-3" />
                         </button>
                       )}
                     </td>
@@ -339,45 +342,45 @@ export default function StormwaterFormPage() {
         </div>
 
         {/* Industrial Areas Table */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-          <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide mb-3">Areas of Industrial Materials or Activities Exposed to Stormwater</h2>
+        <div className="bg-card rounded-lg border border-blue-100 dark:border-border shadow-sm p-4 mb-4">
+          <ChecklistHeading number={5}>Areas of Industrial Materials or Activities Exposed to Stormwater</ChecklistHeading>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse">
+            <table className="w-full min-w-[780px] text-xs border-collapse">
               <thead>
-                <tr className="bg-gray-100">
-                  <th className="border border-gray-300 px-2 py-2 text-left font-semibold">Area/Activity</th>
-                  <th className="border border-gray-300 px-2 py-2 text-center font-semibold w-32">Inspected?</th>
-                  <th className="border border-gray-300 px-2 py-2 text-center font-semibold w-32">Controls Adequate?</th>
-                  <th className="border border-gray-300 px-2 py-2 text-left font-semibold">Maintenance or Corrective Action Needed and Notes</th>
+                <tr className="bg-[#eef4fc] dark:bg-blue-950/30">
+                  <th className="border border-border px-2 py-2 text-left font-semibold">Area/Activity</th>
+                  <th className="border border-border px-2 py-2 text-center font-semibold w-32">Inspected?</th>
+                  <th className="border border-border px-2 py-2 text-center font-semibold w-32">Controls Adequate?</th>
+                  <th className="border border-border px-2 py-2 text-left font-semibold">Maintenance or Corrective Action Needed and Notes</th>
                 </tr>
               </thead>
               <tbody>
                 {industrialRows.map((row, idx) => (
-                  <tr key={row.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                    <td className="border border-gray-300 px-2 py-2 text-sm">{row.area}</td>
-                    <td className="border border-gray-300 px-2 py-2">
+                  <tr key={row.id} className={idx % 2 === 0 ? "bg-card" : "bg-blue-50/40 dark:bg-blue-950/10"}>
+                    <td className="border border-border px-2 py-2 text-sm">{row.area}</td>
+                    <td className="border border-border px-2 py-2">
                       <div className="flex justify-center gap-2">
                         {(["yes", "no", "na"] as const).map(v => (
-                          <label key={v} className="flex items-center gap-0.5 cursor-pointer">
+                          <label key={v} className={`flex items-center gap-0.5 cursor-pointer rounded-full border px-2 py-1 ${row.inspected === v ? checklistAnswerClass(v, true) : "border-border"}`}>
                             <input type="radio" name={`inspected-${row.id}`} checked={row.inspected === v}
-                              onChange={() => updateIndustrialRow(row.id, "inspected", v)} className="w-3 h-3" />
+                              onChange={() => updateIndustrialRow(row.id, "inspected", v)} className="accent-[#548dd4] w-3 h-3" />
                             <span>{v === "na" ? "N/A" : v.charAt(0).toUpperCase() + v.slice(1)}</span>
                           </label>
                         ))}
                       </div>
                     </td>
-                    <td className="border border-gray-300 px-2 py-2">
+                    <td className="border border-border px-2 py-2">
                       <div className="flex justify-center gap-3">
                         {(["yes", "no"] as const).map(v => (
-                          <label key={v} className="flex items-center gap-1 cursor-pointer">
+                          <label key={v} className={`flex items-center gap-1 cursor-pointer rounded-full border px-2 py-1 ${row.controlsAdequate === v ? checklistAnswerClass(v, false) : "border-border"}`}>
                             <input type="radio" name={`adequate-${row.id}`} checked={row.controlsAdequate === v}
-                              onChange={() => updateIndustrialRow(row.id, "controlsAdequate", v)} className="w-3 h-3" />
+                              onChange={() => updateIndustrialRow(row.id, "controlsAdequate", v)} className="accent-[#548dd4] w-3 h-3" />
                             <span>{v === "yes" ? "Yes" : "No"}</span>
                           </label>
                         ))}
                       </div>
                     </td>
-                    <td className="border border-gray-300 px-2 py-1">
+                    <td className="border border-border px-2 py-1">
                       <textarea className="w-full text-xs focus:outline-none bg-transparent resize-none" rows={2} value={row.notes}
                         onChange={e => updateIndustrialRow(row.id, "notes", e.target.value)} placeholder="Notes..." />
                     </td>
@@ -389,7 +392,8 @@ export default function StormwaterFormPage() {
         </div>
 
         {/* Notes */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4 space-y-4">
+        <div className="bg-card rounded-lg border border-blue-100 dark:border-border shadow-sm p-4 mb-4 space-y-4">
+          <ChecklistHeading number={6}>Inspection Notes</ChecklistHeading>
           <div>
             <label className={labelCls}>Describe any incidents of non-compliance observed and not described above:</label>
             <textarea className={`${inputCls} resize-none`} rows={4} value={nonComplianceNotes}
@@ -403,9 +407,9 @@ export default function StormwaterFormPage() {
         </div>
 
         {/* Certification */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-          <h2 className="text-sm font-bold text-center text-gray-800 uppercase mb-3">Certification Statement</h2>
-          <p className="text-xs text-gray-600 mb-4 leading-relaxed">
+        <div className="bg-card rounded-lg border border-blue-100 dark:border-border shadow-sm p-4 mb-4">
+          <ChecklistHeading number={7}>Certification Statement</ChecklistHeading>
+          <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
             "I certify under penalty of law that this document and all attachments were prepared under my direction or supervision in accordance with a system designed to assure that qualified personnel properly gathered and evaluated the information submitted. Based on my inquiry of the person or persons who manage the system, or those persons directly responsible for gathering the information, the information submitted is, to the best of my knowledge and belief, true, accurate, and complete. I am aware that there are significant penalties for submitting false information, including the possibility of fine and imprisonment for knowing violations."
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -421,9 +425,9 @@ export default function StormwaterFormPage() {
         </div>
 
         {/* Fixed bottom action bar */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 flex justify-end gap-3 z-40 sm:left-64">
-          <Button onClick={handleGenerate} disabled={generating} className="gap-2" style={{ background: "#1e2d5e" }}>
-            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+        <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border px-4 py-3 flex justify-end gap-3 z-40 sm:left-64">
+          <Button onClick={handleGenerate} disabled={generating} className="gap-2" style={{ background: "#548dd4" }}>
+            {generating ? <Loader2 className="accent-[#548dd4] w-4 h-4 animate-spin" /> : <Download className="accent-[#548dd4] w-4 h-4" />}
             {generating ? "Generating PDF..." : "Download PDF"}
           </Button>
         </div>

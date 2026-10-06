@@ -12,7 +12,9 @@ Unanswered items have an OPEN badge and the PDF is marked DRAFT. A checklist is 
 
 Startup creates the tank template in a transaction if no tank template exists. For an existing tank template, an exact-match upgrade rewrites only the original, unedited prompts and section names. Question IDs, answers, order and recommendations are preserved. Administrator customizations are retained. No tank-specific database columns are added, and client assignments stay unchanged.
 
-Tank PDFs use a dedicated renderer. Other templates retain the existing PDF layout. Form routes retain their identity during saves and wait for inspections to load before restoring edit screens. Save failures propagate to the UI.
+All checklist screens and PDFs now share the approved MTCS blue style, including SPCC, monthly stormwater, custom templates and the comprehensive annual stormwater evaluation. The checklist builder and saved inspection view use the same numbered section headers and response badges. Form routes retain their identity during saves and wait for inspections to load before restoring edit screens. Save failures propagate to the UI.
+
+`server/mtcs-pdf.ts` owns the shared page layout, wrapping, section headers, result badges and numbered footer. `server/checklist-pdf.ts` renders tank and monthly/custom checklists. Monthly/custom reports keep their existing YES/NO-only export selection and corrective-action recommendations; their notes and photos appear in the supporting appendix. Tank completion and draft rules are unchanged. The annual stormwater renderer preserves weather, discharge descriptions, control measures, industrial areas, notes and the certification statement with a blank signature line. Factual discharge and inspected responses use neutral blue badges; these are not compliance ratings.
 
 Railway's Nixpacks install step explicitly includes development dependencies so tsx and Vite are available when NODE_ENV is production. The runtime start command remains unchanged.
 
@@ -27,6 +29,6 @@ npm test -- tests/tank.test.ts
 npm run build
 ```
 
-The isolated tank tests use a temporary SQLite database and Express app. They cover preserved existing records, repeatable seeding, administrator edits, YES/NO persistence, optional notes, access restrictions, draft/completed state, and tank/existing PDF endpoints. They send no email. The older api.test.ts suite targets an external server on port 5000 and is separate.
+The isolated tank tests use a temporary SQLite database and Express app. They cover preserved existing records, repeatable seeding, administrator edits, YES/NO persistence, optional notes, access restrictions, draft/completed state, all four checklist PDF types, and authenticated annual stormwater export with long notes. They send no email. The older api.test.ts suite targets an external server on port 5000 and is separate.
 
-Browser checks: start a tank inspection with only the existing header fields, record YES/NO answers, save, reopen and refresh the edit URL, then export a draft. Visually review both PDF pages plus optional long notes and photos.
+Browser checks: start an inspection, record YES/NO answers, save, reopen and refresh the edit URL, then export. Review the builder, saved inspection view and annual stormwater form on desktop and mobile. For PDF QA, render representative SPCC (82 questions), monthly stormwater (18), tank (32), custom and annual reports. Check every page, question text, notes, photo count, recommendation content, certification text, page numbering and footer clearance, including text longer than a page.
