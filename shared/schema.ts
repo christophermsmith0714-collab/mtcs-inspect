@@ -2,6 +2,7 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 // Use zod/v4 — drizzle-zod@0.8.x uses zod v4 internally, so extend() requires v4 schemas
 import { z } from "zod/v4";
+import { tankDetailsSchema, type TankDetails } from "./tank";
 
 // Users (clients)
 export const users = sqliteTable("users", {
@@ -67,6 +68,7 @@ export const inspections = sqliteTable("inspections", {
   status: text("status").notNull().default("in_progress"), // "in_progress" | "completed"
   generalComments: text("general_comments"),
   inspectionName: text("inspection_name"),
+  tankDetails: text("tank_details", { mode: "json" }).$type<TankDetails>(),
   createdAt: text("created_at").notNull(),
   completedAt: text("completed_at"),
 });
@@ -80,6 +82,7 @@ export const insertInspectionSchema = createInsertSchema(inspections)
     inspectionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
     generalComments: z.string().max(5000).optional().nullable(),
     inspectionName: z.string().max(300).optional().nullable(),
+    tankDetails: tankDetailsSchema.optional().nullable(),
     status: z.enum(["in_progress", "completed"]).default("in_progress"),
   });
 export type InsertInspection = z.infer<typeof insertInspectionSchema>;

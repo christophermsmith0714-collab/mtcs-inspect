@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { apiRequest, setAuthToken, saveUserToSession, loadUserFromSession } from "./queryClient";
 import { setTemplateCache, type Answer, type Template } from "./data";
+import type { TankDetails } from "@shared/tank";
 
 export type User = {
   id: number;
@@ -22,7 +23,9 @@ export type Inspection = {
   inspectionDate: string;
   status: "in_progress" | "completed";
   generalComments: string;
-  completedAt?: string;
+  inspectionName?: string;
+  tankDetails?: TankDetails | null;
+  completedAt?: string | null;
   createdAt: string;
   answers: Answer[];
 };
@@ -31,6 +34,7 @@ type StoreType = {
   // Auth
   currentUser: User | null;
   authReady: boolean;         // true once we've attempted to restore session
+  inspectionsReady: boolean;
   login: (email: string, password: string) => Promise<User | null>;
   logout: () => Promise<void>;
 
@@ -62,6 +66,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [inspections, setInspections] = useState<Inspection[]>([]);
+  const [inspectionsReady, setInspectionsReady] = useState(false);
 
   // On mount: verify the stored token is still valid with the server
   useEffect(() => {
@@ -153,6 +158,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     saveUserToSession(null);
     setCurrentUser(null);
     setInspections([]);
+    setInspectionsReady(false);
     setTemplates([]);
     setTemplateCache([]);
   };
@@ -174,6 +180,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setInspections(withAnswers);
     } catch (e) {
       console.error("Failed to load inspections:", e);
+    } finally {
+      setInspectionsReady(true);
     }
   };
 
@@ -197,14 +205,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const updateInspection = async (id: number, data: Partial<Inspection>) => {
     const res = await apiRequest("PATCH", `/api/inspections/${id}`, data);
-    if (!res.ok) return;
+    if (!res.ok) throw new Error("Failed to update inspection");
     const updated = await res.json();
     setInspections(prev => prev.map(i => i.id === id ? { ...i, ...updated } : i));
   };
 
   const saveAnswers = async (inspectionId: number, answers: Answer[]) => {
     const res = await apiRequest("POST", `/api/inspections/${inspectionId}/answers`, { answers });
-    if (!res.ok) return;
+    if (!res.ok) throw new Error("Failed to save answers");
     setInspections(prev => prev.map(i => i.id === inspectionId ? { ...i, answers } : i));
   };
 
@@ -217,7 +225,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   return (
     <Store.Provider value={{
-      currentUser, authReady, login, logout,
+      currentUser, authReady, inspectionsReady, login, logout,
       templates, loadTemplates,
       users, setUsers, loadUsers,
       inspections, loadInspections, addInspection, updateInspection, saveAnswers, deleteInspection, getInspection,

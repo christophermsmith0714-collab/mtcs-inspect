@@ -16,6 +16,7 @@ import {
   type AuthToken,
 } from "@shared/schema";
 import crypto from "crypto";
+import { tankTemplate, tankQuestions } from "@shared/tank-checklist";
 
 // ── DB path: from env or default to ./data/spcc.db ──────────────────────────
 const dbPath = process.env.DB_PATH
@@ -105,6 +106,12 @@ try {
 } catch (_) { /* already exists */ }
 
 // ── Storage Interface ────────────────────────────────────────────────────────
+// Additive migration: leave existing inspection records and templates intact.
+const inspectionColumns = sqlite.prepare("PRAGMA table_info(inspections)").all() as { name: string }[];
+if (!inspectionColumns.some(column => column.name === "tank_details")) {
+  sqlite.exec("ALTER TABLE inspections ADD COLUMN tank_details TEXT DEFAULT NULL");
+}
+
 export interface IStorage {
   // Auth tokens
   createToken(userId: number, userRole: string): AuthToken;
@@ -490,4 +497,15 @@ async function seedDatabase() {
   });
 }
 
-seedDatabase().catch(console.error);
+export function ensureTankTemplate() {
+  // A transaction prevents a partial checklist if initialization is interrupted.
+  sqlite.transaction(() => {
+    if (storage.getTemplates().some(t => t.type === "tank")) return;
+    const template = storage.createTemplate(tankTemplate);
+    for (const question of tankQuestions) {
+      storage.createQuestion({ ...question, templateId: template.id });
+    }
+  })();
+}
+
+seedDatabase().then(ensureTankTemplate).catch(console.error);

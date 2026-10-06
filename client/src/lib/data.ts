@@ -1,3 +1,4 @@
+import type { TankDetails } from "@shared/tank";
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export type User = {
@@ -44,6 +45,8 @@ export type Inspection = {
   inspectionDate: string;
   status: "in_progress" | "completed";
   generalComments: string;
+  inspectionName?: string;
+  tankDetails?: TankDetails | null;
   createdAt: string;
   completedAt?: string;
   answers: Answer[];

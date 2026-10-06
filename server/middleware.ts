@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import type {} from "express-session";
 import { storage } from "./storage";
 
 // Extend Request to carry token auth info (replaces session)

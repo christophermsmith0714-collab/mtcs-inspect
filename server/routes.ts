@@ -7,6 +7,7 @@ import nodemailer from "nodemailer";
 import { z } from "zod/v4";
 import { storage } from "./storage";
 import { insertInspectionSchema } from "@shared/schema";
+import { tankDetailsSchema, tankChecklistComplete } from "@shared/tank";
 import { requireAuth, requireAdmin } from "./middleware";
 import { generatePDF } from "./pdf_node";
 import fs from "fs";
@@ -177,7 +178,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.patch("/api/users/:id", requireAuth, requireAdmin, async (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid user ID" });
 
     const { name, email, company, subscriptionStatus, assignedTemplates } = req.body;
@@ -264,7 +265,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.patch("/api/clients/:id", requireAuth, requireAdmin, async (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid client ID" });
 
     const { name, email, password, company, assignedTemplates, subscriptionStatus } = req.body;
@@ -298,7 +299,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get("/api/templates/:id/questions", requireAuth, (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid template ID" });
     res.json(storage.getQuestionsByTemplate(id));
   });
@@ -317,7 +318,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // PATCH /api/templates/:id — admin updates template
   app.patch("/api/templates/:id", requireAuth, requireAdmin, (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid template ID" });
     const { name, type, description } = req.body;
     const updates: any = {};
@@ -331,7 +332,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // DELETE /api/templates/:id — admin deletes template and all its questions
   app.delete("/api/templates/:id", requireAuth, requireAdmin, (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid template ID" });
     storage.deleteQuestionsByTemplate(id);
     storage.deleteTemplate(id);
@@ -340,7 +341,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // POST /api/templates/:id/questions — admin adds a question
   app.post("/api/templates/:id/questions", requireAuth, requireAdmin, (req, res) => {
-    const templateId = parseInt(req.params.id);
+    const templateId = parseInt(String(req.params.id), 10);
     if (isNaN(templateId)) return res.status(400).json({ error: "Invalid template ID" });
     const { section, questionText, recommendResponse, order } = req.body;
     if (!section?.trim() || !questionText?.trim()) {
@@ -361,7 +362,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // POST /api/templates/:id/questions/bulk — import many questions at once (Excel import)
   app.post("/api/templates/:id/questions/bulk", requireAuth, requireAdmin, (req, res) => {
-    const templateId = parseInt(req.params.id);
+    const templateId = parseInt(String(req.params.id), 10);
     if (isNaN(templateId)) return res.status(400).json({ error: "Invalid template ID" });
     const { questions, replace } = req.body as { questions: any[]; replace?: boolean };
     if (!Array.isArray(questions) || questions.length === 0) {
@@ -394,7 +395,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // PATCH /api/questions/:id — admin edits a question
   app.patch("/api/questions/:id", requireAuth, requireAdmin, (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid question ID" });
     const { section, questionText, recommendResponse, order } = req.body;
     const updates: any = {};
@@ -409,7 +410,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // DELETE /api/questions/:id — admin removes a question
   app.delete("/api/questions/:id", requireAuth, requireAdmin, (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid question ID" });
     storage.deleteQuestion(id);
     res.json({ success: true });
@@ -440,7 +441,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get("/api/inspections/:id", requireAuth, (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid inspection ID" });
     const inspection = storage.getInspection(id);
     if (!inspection) return res.status(404).json({ error: "Not found" });
@@ -457,6 +458,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         body.userId = req.authUserId;
       }
       const data = insertInspectionSchema.parse(body);
+      if (storage.getTemplate(data.templateId)?.type === "tank") {
+        data.status = "in_progress";
+        data.completedAt = null;
+      }
       res.status(201).json(storage.createInspection(data));
     } catch (e: any) {
       const isDev = process.env.NODE_ENV !== "production";
@@ -465,19 +470,36 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.patch("/api/inspections/:id", requireAuth, (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid inspection ID" });
     const inspection = storage.getInspection(id);
     if (!inspection) return res.status(404).json({ error: "Not found" });
     if (req.authUserRole !== "admin" && inspection.userId !== req.authUserId) {
       return res.status(403).json({ error: "Forbidden" });
     }
-    const updated = storage.updateInspection(id, req.body);
+    const updates = { ...req.body };
+    if (updates.tankDetails !== undefined) {
+      const result = tankDetailsSchema.nullable().safeParse(updates.tankDetails);
+      if (!result.success) return res.status(400).json({ error: "Invalid tank details" });
+      updates.tankDetails = result.data;
+    }
+    if (storage.getTemplate(inspection.templateId)?.type === "tank") {
+      const details = updates.tankDetails !== undefined ? updates.tankDetails : inspection.tankDetails;
+      const complete = tankChecklistComplete(storage.getQuestionsByTemplate(inspection.templateId), storage.getAnswersByInspection(id), details);
+      if (updates.status === "completed" && !complete) {
+        return res.status(400).json({ error: "Tank ID, report reference, all responses and notes for NO / N/A are required to complete the checklist" });
+      }
+      if (updates.status === "in_progress" || (!complete && inspection.status === "completed")) {
+        updates.status = "in_progress";
+        updates.completedAt = null;
+      }
+    }
+    const updated = storage.updateInspection(id, updates);
     res.json(updated);
   });
 
   app.delete("/api/inspections/:id", requireAuth, (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid inspection ID" });
     const inspection = storage.getInspection(id);
     if (!inspection) return res.status(404).json({ error: "Not found" });
@@ -494,7 +516,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ═══════════════════════════════════════════════════════════════════════════
 
   app.get("/api/inspections/:id/answers", requireAuth, (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid inspection ID" });
     const inspection = storage.getInspection(id);
     if (!inspection) return res.status(404).json({ error: "Not found" });
@@ -513,7 +535,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     express.json({ limit: "50mb" }),
     requireAuth,
     (req, res) => {
-      const id = parseInt(req.params.id);
+      const id = parseInt(String(req.params.id), 10);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid inspection ID" });
       const inspection = storage.getInspection(id);
       if (!inspection) return res.status(404).json({ error: "Not found" });
@@ -541,6 +563,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             photoUrls: JSON.stringify(urlsValue),
           });
         });
+        if (storage.getTemplate(inspection.templateId)?.type === "tank" && answers.length > 0) {
+          storage.updateInspection(id, { status: "in_progress", completedAt: null });
+        }
         res.json(results);
       } catch (e: any) {
         const isDev = process.env.NODE_ENV !== "production";
@@ -554,6 +579,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ═══════════════════════════════════════════════════════════════════════════
 
   const pdfSchema = z.object({
+    tankDetails: tankDetailsSchema.optional().nullable(),
     inspectionName: z.string().max(300).optional(),
     facility: z.string().min(1).max(200),
     address: z.string().max(500).optional(),
@@ -596,7 +622,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const safeData = validation.data;
 
       try {
-        const pdfBuffer = await generatePDF(safeData);
+        const pdfBuffer = await generatePDF({
+          ...safeData,
+          address: safeData.address ?? "",
+          generalComments: safeData.generalComments ?? "",
+          clientName: safeData.clientName ?? "",
+          clientEmail: safeData.clientEmail ?? "",
+          sendToEmail: safeData.sendToEmail ?? "",
+          completedAt: safeData.completedAt ?? "",
+          mtcsContact: safeData.mtcsContact ?? "",
+          answers: safeData.answers.map(answer => ({ ...answer, comments: answer.comments ?? "", photos: answer.photos ?? [] })),
+        });
         const base64 = pdfBuffer.toString("base64");
 
         const facility = safeData.facility;
@@ -610,7 +646,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           dateFmt = d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
         } catch {}
 
-        const filename = `InspectionReport_${facility.replace(/\s+/g, "_")}_${inspDate}.pdf`;
+        const tankSuffix = safeData.templateType === "tank" ? "_" + (safeData.tankDetails?.tankId || "tank").replace(/[^a-z0-9_-]/gi, "_") : "";
+        const filename = `InspectionReport_${facility.replace(/\s+/g, "_")}${tankSuffix}_${inspDate}.pdf`;
 
         const sendTo = safeData.sendToEmail;
         const sendCc = safeData.emailCc;
