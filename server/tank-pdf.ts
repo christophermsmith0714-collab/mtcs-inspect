@@ -16,42 +16,39 @@ export function generateTankPDF(data: TankPdfData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
       size: "LETTER", margins: { top: 36, bottom: 66, left: 36, right: 36 }, bufferPages: true,
-      info: { Title: data.inspectionName || "Tank Inspection Checklist", Author: "Midwest Training and Consulting Services" },
+      info: { Title: data.inspectionName || "MTCS Tank Inspection Checklist", Author: "Midwest Training and Consulting Services" },
     });
     const chunks: Buffer[] = [];
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
-    const blue = "#548dd4"; // Sampled from the supplied integrity report.
-    const x = 36, width = 540, questionWidth = 464, answerWidth = 38, bottom = 718;
+    const blue = "#548dd4", navy = "#20355b", muted = "#53657c", pale = "#eef4fc";
+    const x = 36, width = 540, textX = 66, textWidth = 422, statusX = 504, bottom = 718;
     const byId = new Map(data.answers.map(a => [a.questionId, a]));
     const complete = tankChecklistComplete(data.questions, data.answers);
     let y = 36;
-    const plain = (size = 9) => doc.font("Helvetica").fontSize(size).fillColor("black");
     const measure = (text: string, textWidth: number, bold = false) => {
       doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9);
       return doc.heightOfString(text, { width: textWidth, lineGap: 1 });
     };
     const newPage = () => { doc.addPage(); y = 36; };
     const ensure = (height: number) => { if (y + height > bottom) newPage(); };
-    // Flow optional notes independently of the table, including multi-page notes.
-    const paragraph = (text: string, bold = false, color = "black", size = 9) => {
+    const paragraph = (text: string, bold = false, color = navy, size = 9) => {
       doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(size).fillColor(color);
-      ensure(Math.min(doc.heightOfString(text, { width, lineGap: 2 }) + 8, 55));
+      ensure(Math.min(doc.heightOfString(text, { width, lineGap: 2 }) + 7, 55));
       doc.text(text, x, y, { width, lineGap: 2 });
-      y = doc.y + 8;
+      y = doc.y + 7;
     };
 
-    doc.font("Times-Bold").fontSize(19).fillColor(blue)
-      .text("Tank Inspection Checklist", x, y, { width, align: "center" });
-    y = doc.y + 8;
-    paragraph(data.inspectionName || data.facility, true);
-    if (data.inspectionName) paragraph(data.facility + (data.address ? " | " + data.address : ""));
-    else if (data.address) paragraph(data.address);
-    paragraph("Inspector: " + data.inspector + "    Date: " + data.date);
-    if (!complete) paragraph("DRAFT - Unanswered items have blank YES / NO cells.", false, blue, 8);
-    paragraph("Findings:", true, blue, 11);
-    y += 2;
+    doc.rect(x, y, width, 3).fill(blue);
+    y += 14;
+    paragraph("MTCS  /  INTEGRITY REPORT COMPANION", true, muted, 8);
+    paragraph("Tank Inspection Checklist", true, blue, 22);
+    if (data.inspectionName) paragraph(data.inspectionName, true);
+    paragraph(data.facility + (data.address ? " | " + data.address : ""));
+    paragraph("Inspector: " + data.inspector + "     Inspection date: " + data.date, false, muted);
+    if (!complete) paragraph("DRAFT - Items marked OPEN still need a YES or NO response.", true, blue, 8);
+    y += 5;
 
     const groups: { section: string; questions: TankPdfData["questions"] }[] = [];
     for (const q of data.questions) {
@@ -59,58 +56,47 @@ export function generateTankPDF(data: TankPdfData): Promise<Buffer> {
       if (last?.section === q.section) last.questions.push(q);
       else groups.push({ section: q.section, questions: [q] });
     }
-    const rowText = (q: TankPdfData["questions"][number]) => {
-      const a = byId.get(q.id);
-      // Preserve a legacy/custom N/A response without treating it as YES or NO.
-      return q.questionText + (a?.photos?.length ? "  (See Photo)" : "") + (a?.answer === "n/a" ? "  (N/A)" : "");
-    };
-    const rowHeight = (q: TankPdfData["questions"][number]) => Math.max(17, measure(rowText(q), questionWidth - 6) + 6);
-    const border = (top: number, height: number) => {
-      doc.lineWidth(0.65).strokeColor("black").rect(x, top, width, height).stroke();
-      for (const cellX of [x + questionWidth, x + questionWidth + answerWidth]) {
-        doc.moveTo(cellX, top).lineTo(cellX, top + height).stroke();
-      }
-    };
-    const tableHeader = (name: string) => {
-      const height = Math.max(17, measure(name, questionWidth - 6, true) + 6);
-      doc.rect(x, y, width, height).fill("#c0c0c0");
-      border(y, height);
-      doc.font("Helvetica-Bold").fontSize(9).fillColor("black").text(name, x + 3, y + 3, { width: questionWidth - 6 });
-      for (const [index, label] of ["YES", "NO"].entries()) {
-        doc.text(label, x + questionWidth + index * answerWidth, y + 3, { width: answerWidth, align: "center" });
-      }
-      y += height;
+    const rowText = (q: TankPdfData["questions"][number]) => q.questionText + (byId.get(q.id)?.photos?.length ? "  [Photo attached]" : "");
+    const rowHeight = (q: TankPdfData["questions"][number]) => Math.max(22, measure(rowText(q), textWidth) + 9);
+    const sectionHeading = (name: string, index: number, continued = false) => {
+      const title = name + (continued ? " (continued)" : "");
+      const height = Math.max(26, measure(title, 410, true) + 11);
+      doc.roundedRect(x, y, width, height, 4).fill(pale);
+      doc.roundedRect(x, y, 24, height, 4).fill(blue);
+      doc.font("Helvetica-Bold").fontSize(9).fillColor("white").text(String(index + 1).padStart(2, "0"), x, y + 8, { width: 24, align: "center" });
+      doc.fillColor(navy).text(title, textX, y + 7, { width: 410 });
+      doc.fontSize(7).fillColor(muted).text("RESULT", statusX, y + 8, { width: 62, align: "center" });
+      y += height + 3;
     };
 
     for (const [index, group] of groups.entries()) {
-      // Match the two-page grouping in the supplied checklist. Edited templates
-      // still paginate by their measured row heights and repeat table headers.
-      if (index > 0 && group.section === "Tank Manway, Piping & Equipment") newPage();
-      const headerHeight = Math.max(17, measure(group.section, questionWidth - 6, true) + 6);
+      const headerHeight = Math.max(26, measure(group.section, 410, true) + 11) + 3;
       const totalHeight = headerHeight + group.questions.reduce((sum, q) => sum + rowHeight(q), 0);
       ensure(totalHeight <= bottom - 36 ? totalHeight : headerHeight + rowHeight(group.questions[0]));
-      tableHeader(group.section);
+      sectionHeading(group.section, index);
       for (const q of group.questions) {
         const height = rowHeight(q);
-        if (y + height > bottom) { newPage(); tableHeader(group.section + " (continued)"); }
+        if (y + height > bottom) { newPage(); sectionHeading(group.section, index, true); }
         const answer = byId.get(q.id)?.answer;
-        if (answer === "yes" || answer === "no") {
-          const cellX = x + questionWidth + (answer === "no" ? answerWidth : 0);
-          doc.rect(cellX, y, answerWidth, height).fill(answer === "yes" ? "#008000" : "#ff0000");
-        }
-        border(y, height);
-        plain().text(rowText(q), x + 3, y + 3, { width: questionWidth - 6, lineGap: 1 });
+        const label = answer === "yes" ? "YES" : answer === "no" ? "NO" : answer === "n/a" ? "N/A" : "OPEN";
+        const color = answer === "yes" ? "#187347" : answer === "no" ? "#b63737" : muted;
+        const fill = answer === "yes" ? "#e8f4ed" : answer === "no" ? "#fdecec" : "#f0f3f7";
+        const itemNumber = data.questions.indexOf(q) + 1;
+        doc.font("Helvetica").fontSize(8).fillColor(muted).text(String(itemNumber).padStart(2, "0"), x + 4, y + 6, { width: 20 });
+        doc.fontSize(9).fillColor(navy).text(rowText(q), textX, y + 5, { width: textWidth, lineGap: 1 });
+        doc.roundedRect(statusX, y + (height - 16) / 2, 62, 16, 8).fill(fill);
+        doc.font("Helvetica-Bold").fontSize(8).fillColor(color).text(label, statusX, y + (height - 16) / 2 + 4, { width: 62, align: "center" });
+        doc.moveTo(x, y + height).lineTo(x + width, y + height).strokeColor("#dce5ef").lineWidth(0.4).stroke();
         y += height;
       }
-      y += 16;
+      y += 10;
     }
 
-    // Only add supporting material when the inspector actually entered it.
     const notes = data.questions.filter(q => byId.get(q.id)?.comments?.trim());
     const photos = data.questions.filter(q => byId.get(q.id)?.photos?.length);
     if (notes.length || data.generalComments?.trim() || photos.length) {
       newPage();
-      paragraph("Inspection Notes and Photos", true, blue, 12);
+      paragraph("Inspection Notes & Photos", true, blue, 16);
       for (const q of notes) {
         const label = "Item " + (data.questions.indexOf(q) + 1) + ": " + q.questionText;
         ensure(measure(label, width, true) + 50);
@@ -135,10 +121,12 @@ export function generateTankPDF(data: TankPdfData): Promise<Buffer> {
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
+      doc.moveTo(x, 736).lineTo(x + width, 736).strokeColor(blue).lineWidth(0.8).stroke();
       doc.font("Helvetica-Bold").fontSize(8).fillColor(blue);
-      doc.text("Midwest Training and Consulting Services", x, 744, { lineBreak: false });
-      doc.text("13470 S Arapahoe Drive, Suite 130, Olathe, KS 66062 - 913-712-8077", x, 755, { lineBreak: false });
-      doc.font("Helvetica").fontSize(8).text("Page " + (i + 1) + " of " + range.count, 510, 744, { lineBreak: false });
+      doc.text("Midwest Training and Consulting Services", x, 746, { lineBreak: false });
+      doc.font("Helvetica").fontSize(7).fillColor(muted);
+      doc.text("13470 S Arapahoe Drive, Suite 130, Olathe, KS 66062 | 913-712-8077", x, 758, { lineBreak: false });
+      doc.text("MTCS | " + (i + 1) + " / " + range.count, 510, 746, { lineBreak: false });
     }
     doc.end();
   });

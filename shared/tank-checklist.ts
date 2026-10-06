@@ -1,56 +1,56 @@
-// Checklist supplied by MTCS for the integrity testing report companion.
+// MTCS wording for the 32 inspection points selected by the user.
 export const tankTemplate = {
   name: "Tank Inspection - Integrity Report Companion",
   type: "tank",
-  description: "Tank inspection findings: 32 YES/NO questions with optional comments and photos.",
+  description: "MTCS tank checklist: 32 YES/NO inspection points with optional notes and photos.",
 };
 
 const sections: [string, string[]][] = [
-  ["Administrative Requirements", [
-    "The tank was inspected within three years?",
-    "Facility knows tank design standard?",
-    "The facility knows the age of the tank?",
-    "The tank is registered with the state environmental and fire agencies?",
-    "There is an AST record available for each AST?",
+  ["Records & Identification", [
+    "Do the inspection records show a tank inspection within the past three years?",
+    "Can the facility identify the standard used to design this tank?",
+    "Is the tank's age known to the facility?",
+    "Is the tank registered with the state environmental and fire authorities?",
+    "Does the facility maintain an individual AST record for this tank?",
   ]],
-  ["Tank Foundation/Supports", [
-    "Tank settlement or foundation free from washout?",
-    "Concrete pad or ring wall free of cracking and spalling?",
-    "Tank supports and skids are in good condition?",
-    "Water able to drain away from tank if tank is resting on a foundation or on the ground?",
-    "Grounding strap between the tank and foundation/supports is in good condition?",
-    "Confirm that there is no soil resting against the side of the AST?",
+  ["Base, Supports & Drainage", [
+    "Is the tank base stable, without visible settlement or washout?",
+    "Are the concrete pad or ring wall intact, without cracking or spalling?",
+    "Are the tank's supports and skids in serviceable condition?",
+    "Does water drain away from the tank and its foundation or ground contact area?",
+    "Is the grounding strap between the tank and its foundation or supports intact?",
+    "Are the tank sides clear of accumulated soil?",
   ]],
-  ["Tank Shells, Heads and Roof", [
-    "Tank is free of visible signs of coating failure?",
-    "Tank is free of indications of rusting?",
-    "Tank exterior free of visible leaks?",
-    "Area around the tank (concrete surfaces and ground) free of visible signs of leakage?",
-    "AST is labeled with capacity?",
-    "Shop AST construction is confirmed (UL142) - for flammable and combustible liquids?",
-    "Shop AST construction is confirmed UL 2080 - Fire Resistant Tank (Flameshield or F921)?",
-    "Labels (NFPA 704) and warnings are intact and visible?",
-    "Labels are positioned where they are visible to emergency responders?",
+  ["Tank Body & Safety Markings", [
+    "Is the exterior coating intact, without visible deterioration?",
+    "Are the tank surfaces free of visible rust?",
+    "Is the tank exterior free of visible product leaks?",
+    "Are the nearby concrete and soil free of signs of product leakage?",
+    "Is the tank capacity clearly marked?",
+    "Is UL 142 construction documented for this shop-built flammable/combustible liquid tank?",
+    "Is the shop-built tank documented as UL 2080 fire-resistant construction (Flameshield or F921)?",
+    "Are NFPA 704 markings and other warning labels present, legible and intact?",
+    "Can emergency responders readily see the tank's safety markings?",
   ]],
-  ["Tank Manway, Piping & Equipment", [
-    "Piping connection bolts are tight and fully engaged?",
-    "Piping is free of corrosion on clamps, crevices and supports?",
+  ["Connections & Pipework", [
+    "Are piping connection bolts secure and fully engaged?",
+    "Are piping clamps, crevices and supports free of corrosion?",
   ]],
-  ["Tank Equipment", [
-    "Each tank has been provided with normal vents that are free of obstructions?",
-    "Each tank has been provided with emergency vents that are free of obstructions?",
-    "Emergency vents in good working condition and functional, as required by manufacturer?",
-    "Interstitial sight gauges are clear?",
-    "Overfill protection has been provided and annually inspected and confirmed to be in working condition, reading correctly?",
-    "Electronic alarms are set at 90% - overfill 95% level?",
+  ["Venting, Gauges & Overfill Controls", [
+    "Does the tank have normal venting with unobstructed openings?",
+    "Does the tank have emergency venting with unobstructed openings?",
+    "Do emergency vents function correctly and meet the manufacturer's condition requirements?",
+    "Are interstitial sight gauges clear and readable?",
+    "Is overfill protection installed, inspected annually and verified to operate and indicate correctly?",
+    "Are the electronic alarm and overfill settings 90% and 95%, respectively?",
   ]],
-  ["Tank/Piping Release Detection", [
-    "Inventory control is being performed and documented?",
-    "Release detection from containment is being performed and documented?",
+  ["Inventory & Leak Monitoring", [
+    "Is inventory control carried out and recorded?",
+    "Is containment release detection carried out and recorded?",
   ]],
-  ["Other Equipment", [
-    "Electrical wiring and boxes are in good condition?",
-    "Electrical conduit has not been placed on floor of containment?",
+  ["Electrical Installation", [
+    "Are visible electrical wiring and enclosures in good condition?",
+    "Is electrical conduit kept off the containment floor?",
   ]],
 ];
 
