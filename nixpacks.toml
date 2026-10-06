@@ -2,7 +2,8 @@
 nixPkgs = ["nodejs_20", "python3", "python3Packages.pip", "python3Packages.reportlab", "python3Packages.pillow"]
 
 [phases.install]
-cmds = ["npm ci"]
+# Railway sets NODE_ENV=production; tsx and Vite are still needed at build time.
+cmds = ["npm ci --include=dev"]
 
 [phases.build]
 cmds = ["npm run build"]

@@ -1,18 +1,20 @@
 # Tank inspection checklist
 
-The **Tank Inspection - Integrity Report Companion** template contains the 32 YES/NO questions in the seven sections supplied by MTCS. It uses the existing inspection name, facility, inspector, date, comments and photo fields.
+The **Tank Inspection - Integrity Report Companion** template contains 32 YES/NO inspection points selected by MTCS, with independently rewritten prompts and section names. It uses the existing inspection name, facility, inspector, date, comments and photo fields.
 
 Select it under **Dashboard > Start New Inspection**. Admins can edit questions under **Checklists** and assign the template to clients through existing client template assignments.
 
-The PDF follows the supplied two-page findings tables: gray section headers, black grid lines, narrow YES/NO columns, green YES cells and red NO cells. Headings and the company footer use the integrity report's blue (#548DD4). The first page has Administrative Requirements, Tank Foundation/Supports, and Tank Shells, Heads and Roof. The remaining four sections start on the second page. Rows wrap and edited sections paginate with repeated headers.
+The PDF uses a distinct MTCS design: a blue brand rule, left-aligned title, numbered section bands, fine row separators and a single RESULT column with labeled YES/NO badges. Headings use the integrity report's blue (#548DD4). Green and red badges also include text so the response remains clear in grayscale. The default checklist occupies two pages; edited questions wrap and sections paginate with repeated headings.
 
-Unanswered items have blank answer cells and the PDF is marked DRAFT. A checklist is complete when every question has a YES or NO answer; comments and photos are optional. Supporting notes and photos are appended only when entered. There are no additional tank-detail forms or corrective-action fields.
+Unanswered items have an OPEN badge and the PDF is marked DRAFT. A checklist is complete when every question has a YES or NO answer; comments and photos are optional. Supporting notes and photos are appended only when entered. There are no additional tank-detail forms or corrective-action fields.
 
 ## Data and deployment
 
-Startup creates the tank template in a transaction if no tank template exists. No tank-specific database columns are added. Existing templates, inspections and client assignments are retained; subsequent starts preserve administrator edits.
+Startup creates the tank template in a transaction if no tank template exists. For an existing tank template, an exact-match upgrade rewrites only the original, unedited prompts and section names. Question IDs, answers, order and recommendations are preserved. Administrator customizations are retained. No tank-specific database columns are added, and client assignments stay unchanged.
 
 Tank PDFs use a dedicated renderer. Other templates retain the existing PDF layout. Form routes retain their identity during saves and wait for inspections to load before restoring edit screens. Save failures propagate to the UI.
+
+Railway's Nixpacks install step explicitly includes development dependencies so tsx and Vite are available when NODE_ENV is production. The runtime start command remains unchanged.
 
 ## Validation
 

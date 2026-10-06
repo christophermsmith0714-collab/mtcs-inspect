@@ -17,6 +17,7 @@ import {
 } from "@shared/schema";
 import crypto from "crypto";
 import { tankTemplate, tankQuestions } from "@shared/tank-checklist";
+import { revisedTankQuestion } from "./tank-question-upgrade";
 
 // ── DB path: from env or default to ./data/spcc.db ──────────────────────────
 const dbPath = process.env.DB_PATH
@@ -494,7 +495,14 @@ async function seedDatabase() {
 export function ensureTankTemplate() {
   // A transaction prevents a partial checklist if initialization is interrupted.
   sqlite.transaction(() => {
-    if (storage.getTemplates().some(t => t.type === "tank")) return;
+    const existing = storage.getTemplates().find(t => t.type === "tank");
+    if (existing) {
+      for (const question of storage.getQuestionsByTemplate(existing.id)) {
+        const revision = revisedTankQuestion(question);
+        if (revision) storage.updateQuestion(question.id, revision);
+      }
+      return;
+    }
     const template = storage.createTemplate(tankTemplate);
     for (const question of tankQuestions) {
       storage.createQuestion({ ...question, templateId: template.id });

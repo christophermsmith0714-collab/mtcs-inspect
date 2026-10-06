@@ -488,9 +488,9 @@ export default function InspectionFormPage({
       )}
 
       {/* Sections */}
-      {isTankDraft && <p className="mb-4 text-sm text-muted-foreground">Choose YES or NO for each item. Unanswered items stay blank in the draft PDF. Comments and photos are optional.</p>}
+      {isTankDraft && <p className="mb-4 text-sm text-muted-foreground">Choose YES or NO for each item. Unanswered items are marked OPEN in the draft PDF. Comments and photos are optional.</p>}
       <div className="space-y-3 pb-24">
-        {sections.map(section => {
+        {sections.map((section, sectionIndex) => {
           const sectionQs = questions.filter(q => q.section === section);
           const collapsed = collapsedSections.has(section);
           const sectionAnswered = sectionQs.filter(q => answers[q.id]?.answer).length;
@@ -499,8 +499,9 @@ export default function InspectionFormPage({
           return (
             <Card key={section} className="shadow-sm overflow-hidden">
               <button type="button" onClick={() => toggleSection(section)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-muted/60 hover:bg-muted transition-colors border-b border-border">
+                className={`w-full flex items-center justify-between px-4 py-3 transition-colors border-b border-border ${isTank ? "bg-blue-50/80 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-950/50" : "bg-muted/60 hover:bg-muted"}`}>
                 <div className="flex items-center gap-2">
+                  {isTank && <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#548dd4] text-xs font-bold text-white">{String(sectionIndex + 1).padStart(2, "0")}</span>}
                   {allDone && <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" />}
                   <span className="font-semibold text-sm">{section}</span>
                   <Badge variant="outline" className="text-xs">{sectionAnswered}/{sectionQs.length}</Badge>

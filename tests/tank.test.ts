@@ -49,8 +49,8 @@ describe("Tank checklist persistence and access", () => {
   it("seeds the supplied 32 questions once and preserves administrator edits", () => {
     expect(questions).toHaveLength(32);
     expect([...new Set(questions.map(q => q.section))]).toEqual([
-      "Administrative Requirements", "Tank Foundation/Supports", "Tank Shells, Heads and Roof",
-      "Tank Manway, Piping & Equipment", "Tank Equipment", "Tank/Piping Release Detection", "Other Equipment",
+      "Records & Identification", "Base, Supports & Drainage", "Tank Body & Safety Markings",
+      "Connections & Pipework", "Venting, Gauges & Overfill Controls", "Inventory & Leak Monitoring", "Electrical Installation",
     ]);
     const first = questions[0];
     storage.updateQuestion(first.id, { questionText: "Locally customized tank question" });
@@ -69,6 +69,21 @@ describe("Tank checklist persistence and access", () => {
     expect(created.body.status).toBe("in_progress");
     const loaded = await request(app).get(`/api/inspections/${inspectionId}`).set("Authorization", `Bearer ${token}`);
     expect(loaded.body.inspectionName).toBe("Tank 1");
+  });
+  it("updates only unedited original prompts while preserving answers and question IDs", () => {
+    const first = questions[0];
+    const second = questions[1];
+    storage.updateQuestion(first.id, { section: "Administrative Requirements", questionText: "The tank was inspected within three years?" });
+    storage.updateQuestion(second.id, { questionText: "Administrator's custom wording" });
+    storage.upsertAnswer({ inspectionId, questionId: first.id, answer: "no", comments: "Existing observation", photoUrls: "[]" });
+    ensureTankTemplate();
+    const revised = storage.getQuestionsByTemplate(templateId);
+    expect(revised[0].id).toBe(first.id);
+    expect(revised[0].questionText).toBe(first.questionText);
+    expect(revised[0].section).toBe(first.section);
+    expect(revised[1].questionText).toBe("Administrator's custom wording");
+    expect(storage.getAnswersByInspection(inspectionId).find(a => a.questionId === first.id)?.comments).toBe("Existing observation");
+    storage.updateQuestion(second.id, { questionText: second.questionText });
   });
   it("requires authentication and preserves ownership restrictions", async () => {
     expect((await request(app).get(`/api/inspections/${inspectionId}`)).status).toBe(401);
