@@ -5,7 +5,6 @@
  */
 import PDFDocument from "pdfkit";
 import { generateTankPDF } from "./tank-pdf";
-import type { TankDetails } from "@shared/tank";
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 const GREEN       = "#15803d";
@@ -70,7 +69,6 @@ const CFR_RECOMMENDATIONS: Record<number, { cfr: string; recommendation: string 
 interface Question { id: number; questionText: string; section: string; recommendResponse?: string; }
 interface Answer   { questionId: number; answer: string; comments: string; photos: string[]; }
 interface PdfData {
-  tankDetails?: TankDetails | null;
   inspectionName?: string;
   facility: string;
   address: string;

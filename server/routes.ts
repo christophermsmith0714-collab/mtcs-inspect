@@ -7,7 +7,7 @@ import nodemailer from "nodemailer";
 import { z } from "zod/v4";
 import { storage } from "./storage";
 import { insertInspectionSchema } from "@shared/schema";
-import { tankDetailsSchema, tankChecklistComplete } from "@shared/tank";
+import { tankChecklistComplete } from "@shared/tank";
 import { requireAuth, requireAdmin } from "./middleware";
 import { generatePDF } from "./pdf_node";
 import fs from "fs";
@@ -478,16 +478,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       return res.status(403).json({ error: "Forbidden" });
     }
     const updates = { ...req.body };
-    if (updates.tankDetails !== undefined) {
-      const result = tankDetailsSchema.nullable().safeParse(updates.tankDetails);
-      if (!result.success) return res.status(400).json({ error: "Invalid tank details" });
-      updates.tankDetails = result.data;
-    }
     if (storage.getTemplate(inspection.templateId)?.type === "tank") {
-      const details = updates.tankDetails !== undefined ? updates.tankDetails : inspection.tankDetails;
-      const complete = tankChecklistComplete(storage.getQuestionsByTemplate(inspection.templateId), storage.getAnswersByInspection(id), details);
+      const complete = tankChecklistComplete(storage.getQuestionsByTemplate(inspection.templateId), storage.getAnswersByInspection(id));
       if (updates.status === "completed" && !complete) {
-        return res.status(400).json({ error: "Tank ID, report reference, all responses and notes for NO / N/A are required to complete the checklist" });
+        return res.status(400).json({ error: "Choose YES or NO for every item to complete the tank checklist" });
       }
       if (updates.status === "in_progress" || (!complete && inspection.status === "completed")) {
         updates.status = "in_progress";
@@ -579,7 +573,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ═══════════════════════════════════════════════════════════════════════════
 
   const pdfSchema = z.object({
-    tankDetails: tankDetailsSchema.optional().nullable(),
     inspectionName: z.string().max(300).optional(),
     facility: z.string().min(1).max(200),
     address: z.string().max(500).optional(),
@@ -646,7 +639,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           dateFmt = d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
         } catch {}
 
-        const tankSuffix = safeData.templateType === "tank" ? "_" + (safeData.tankDetails?.tankId || "tank").replace(/[^a-z0-9_-]/gi, "_") : "";
+        const tankSuffix = safeData.templateType === "tank" ? "_Tank" : "";
         const filename = `InspectionReport_${facility.replace(/\s+/g, "_")}${tankSuffix}_${inspDate}.pdf`;
 
         const sendTo = safeData.sendToEmail;

@@ -13,8 +13,7 @@ import { useStore } from "@/lib/store";
 import { getTemplate, type Answer, type Question } from "@/lib/data";
 import { Camera, X, CheckCircle, ChevronDown, ChevronUp, Share2, Save, ArrowLeft, FileDown, Loader2, Pencil } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import { emptyTankDetails, tankChecklistComplete, type TankDetails } from "@shared/tank";
-import { TankDetailsForm, CorrectiveActionForm } from "@/components/tank-details";
+import { tankChecklistComplete } from "@shared/tank";
 
 type AnswerState = { answer: "yes" | "no" | "n/a" | ""; comments: string; photos: string[] };
 
@@ -34,7 +33,6 @@ export default function InspectionFormPage({
   const resolvedTemplateId = templateId ?? existing?.templateId ?? 1;
   const template = getTemplate(resolvedTemplateId);
   const isTank = template?.type === "tank";
-  const [tankDetails, setTankDetails] = useState<TankDetails>(existing?.tankDetails ?? emptyTankDetails());
 
   // Fetch questions from API — wait for authReady so token is guaranteed set
   const { data: questions = [], isLoading: questionsLoading, error: questionsError } = useQuery<Question[]>({
@@ -153,7 +151,7 @@ export default function InspectionFormPage({
         inspectorName: inspector,
         inspectionDate: date,
         generalComments,
-        ...(isTank ? { tankDetails, status: "in_progress", completedAt: null } : {}),
+        ...(isTank ? { status: "in_progress", completedAt: null } : {}),
         inspectionName: inspectionName.trim() || undefined,
       } as any);
       return inspId;
@@ -167,7 +165,6 @@ export default function InspectionFormPage({
       inspectionDate: date,
       status: "in_progress",
       generalComments,
-      ...(isTank ? { tankDetails } : {}),
       inspectionName: inspectionName.trim() || undefined,
     } as any);
     setInspId(insp.id);
@@ -216,12 +213,12 @@ export default function InspectionFormPage({
       }
 
       if (result.pdf) {
-        await updateInspection(id, isTank && !tankChecklistComplete(questions, allAnswers, tankDetails)
+        await updateInspection(id, isTank && !tankChecklistComplete(questions, allAnswers)
           ? { status: "in_progress", completedAt: null }
           : { status: "completed", completedAt: new Date().toISOString() });
         const bytes = Uint8Array.from(atob(result.pdf), c => c.charCodeAt(0));
         const blob = new Blob([bytes], { type: "application/pdf" });
-        const filename = `InspectionReport_${facility.replace(/\s+/g, "_")}${isTank ? "_" + tankDetails.tankId.replace(/[^a-z0-9_-]/gi, "_") : ""}_${date}.pdf`;
+        const filename = `InspectionReport_${facility.replace(/\s+/g, "_")}${isTank ? "_Tank" : ""}_${date}.pdf`;
 
         // Set state first so modal renders
         setPdfBlob(blob);
@@ -264,7 +261,6 @@ export default function InspectionFormPage({
 
   const buildPayload = (sendTo = "", message = "") => ({
     facility, address, inspector, date, generalComments,
-    ...(isTank ? { tankDetails } : {}),
     inspectionName: inspectionName.trim() || template?.name || "Inspection Report",
     templateName: template?.name ?? "Inspection Report",
     templateType: template?.type ?? "spcc",
@@ -304,7 +300,7 @@ export default function InspectionFormPage({
         result = await r.json();
       } finally { clearTimeout(timer); }
       if (result.emailSent) {
-        await updateInspection(id, isTank && !tankChecklistComplete(questions, buildAnswerArray(), tankDetails)
+        await updateInspection(id, isTank && !tankChecklistComplete(questions, buildAnswerArray())
           ? { status: "in_progress", completedAt: null }
           : { status: "completed", completedAt: new Date().toISOString() });
         toast({ title: "Report sent", description: `Emailed to ${emailTo}` });
@@ -314,7 +310,7 @@ export default function InspectionFormPage({
         if (result.pdf) {
           const bytes = Uint8Array.from(atob(result.pdf), c => c.charCodeAt(0));
           setPdfBlob(new Blob([bytes], { type: "application/pdf" }));
-          setPdfFilename(`InspectionReport_${facility.replace(/\s+/g, "_")}${isTank ? "_" + tankDetails.tankId.replace(/[^a-z0-9_-]/gi, "_") : ""}_${date}.pdf`);
+          setPdfFilename(`InspectionReport_${facility.replace(/\s+/g, "_")}${isTank ? "_Tank" : ""}_${date}.pdf`);
         }
       } else {
         toast({ title: "Email failed", description: result.emailError || "Try again", variant: "destructive" });
@@ -333,7 +329,7 @@ export default function InspectionFormPage({
   };
 
   const answeredCount = questions.filter(q => answers[q.id]?.answer).length;
-  const isTankDraft = isTank && !tankChecklistComplete(questions, buildAnswerArray(), tankDetails);
+  const isTankDraft = isTank && !tankChecklistComplete(questions, buildAnswerArray());
   const skippedCount = questions.length - answeredCount;
   const progress = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0;
 
@@ -406,11 +402,10 @@ export default function InspectionFormPage({
                 <Textarea id="comments" placeholder="Overall site condition, weather, notes..." value={generalComments}
                   onChange={e => setGeneralComments(e.target.value)} className="mt-1 resize-none" rows={3} />
               </div>
-              {isTank && <TankDetailsForm value={tankDetails} onChange={setTankDetails} />}
               <Button
                 className="w-full"
                 data-testid="button-start"
-                disabled={!inspectionName.trim() || !facility.trim() || !inspector.trim() || !date || (isTank && (!tankDetails.tankId.trim() || !tankDetails.reportReference.trim()))}
+                disabled={!inspectionName.trim() || !facility.trim() || !inspector.trim() || !date}
                 onClick={() => setHeaderDone(true)}
               >
                 Start Inspection
@@ -493,11 +488,7 @@ export default function InspectionFormPage({
       )}
 
       {/* Sections */}
-      {isTank && <div className="mb-4 space-y-3">
-        <TankDetailsForm value={tankDetails} onChange={setTankDetails} />
-        <p className="text-sm text-muted-foreground">YES = satisfactory / verified. NO = finding needing follow-up. Use N/A only when not applicable and explain why. Add observations for every NO response. Unanswered items remain visible in draft reports.</p>
-        {isTankDraft && <p className="text-sm text-amber-800 dark:text-amber-300">Draft: complete all responses and notes for NO / N/A before finalizing. You can save or export a draft at any time.</p>}
-      </div>}
+      {isTankDraft && <p className="mb-4 text-sm text-muted-foreground">Choose YES or NO for each item. Unanswered items stay blank in the draft PDF. Comments and photos are optional.</p>}
       <div className="space-y-3 pb-24">
         {sections.map(section => {
           const sectionQs = questions.filter(q => q.section === section);
@@ -530,7 +521,7 @@ export default function InspectionFormPage({
 
                         {/* Yes / No */}
                         <div className="flex gap-2 ml-6 mb-3">
-                          {(isTank ? ["yes", "no", "n/a"] as const : ["yes", "no"] as const).map(opt => (
+                          {(["yes", "no"] as const).map(opt => (
                             <button key={opt} type="button"
                               data-testid={`answer-${q.id}-${opt}`}
                               aria-pressed={a.answer === opt}
@@ -538,7 +529,7 @@ export default function InspectionFormPage({
                               className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border ${
                                 a.answer === opt
                                   ? opt === "yes" ? "bg-green-600 text-white border-green-600"
-                                  : opt === "no" ? "bg-red-600 text-white border-red-600" : "bg-slate-600 text-white border-slate-600"
+                                  : "bg-red-600 text-white border-red-600"
                                   : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary"
                               }`}>
                               {opt}
@@ -550,18 +541,13 @@ export default function InspectionFormPage({
                         <div className="ml-6 space-y-2">
                           <Textarea
                             data-testid={`comments-${q.id}`}
-                            placeholder={isTank && a.answer === "n/a" ? "Explain why this item does not apply..." : isTank && a.answer === "no" ? "Describe the finding and its location..." : "Add comments..."}
+                            placeholder={isTank && a.answer === "no" ? "Describe the finding and its location..." : "Add comments..."}
                             maxLength={2000}
                             value={a.comments}
                             onChange={e => setAnswer(q.id, "comments", e.target.value)}
                             className="text-sm resize-none"
                             rows={2}
                           />
-                          {isTank && a.answer === "no" && <>
-                            <p className="text-xs text-muted-foreground">Suggested follow-up: {q.recommendResponse}</p>
-                            <CorrectiveActionForm id={q.id} value={tankDetails.correctiveActions[String(q.id)]}
-                              onChange={action => setTankDetails(prev => ({ ...prev, correctiveActions: { ...prev.correctiveActions, [q.id]: action } }))} />
-                          </>}
                           <div className="flex items-center gap-2 flex-wrap">
                             {a.photos.map((photo, pi) => (
                               <div key={pi} className="relative w-14 h-14 rounded-lg overflow-hidden border border-border group">

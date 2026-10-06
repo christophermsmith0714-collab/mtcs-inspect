@@ -11,7 +11,6 @@ import { getTemplate, type Question } from "@/lib/data";
 import { ArrowLeft, Edit, CheckCircle, XCircle, MinusCircle, Loader2, CalendarDays, Check } from "lucide-react";
 import { getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { TankDetailsSummary } from "@/components/tank-details";
 
 export default function InspectionDetailPage({ inspectionId }: { inspectionId: number }) {
   const [, navigate] = useHashLocation();
@@ -134,13 +133,13 @@ export default function InspectionDetailPage({ inspectionId }: { inspectionId: n
       </div>
 
       {/* Summary */}
-      {inspection.tankDetails && <TankDetailsSummary value={inspection.tankDetails} />}
-      <div className={`grid ${template?.type === "tank" ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"} gap-3 mb-5`}>
+      <div className="grid grid-cols-3 gap-3 mb-5">
         {[
           { label: "YES", value: yesCount, cls: "bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-400" },
           { label: "NO",  value: noCount,  cls: "bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-400" },
-          { label: "N/A", value: naCount,  cls: "bg-muted text-muted-foreground" },
-          ...(template?.type === "tank" ? [{ label: "NOT CHECKED", value: questions.filter(q => !answerMap.get(q.id)?.answer).length, cls: "bg-muted text-muted-foreground" }] : []),
+          template?.type === "tank"
+            ? { label: "NOT CHECKED", value: questions.filter(q => !["yes", "no"].includes(answerMap.get(q.id)?.answer ?? "")).length, cls: "bg-muted text-muted-foreground" }
+            : { label: "N/A", value: naCount, cls: "bg-muted text-muted-foreground" },
         ].map(({ label, value, cls }) => (
           <Card key={label} className={`shadow-sm ${cls}`}>
             <CardContent className="py-4 text-center">
@@ -197,15 +196,6 @@ export default function InspectionDetailPage({ inspectionId }: { inspectionId: n
                               ))}
                             </div>
                           )}
-                          {a?.answer === "no" && inspection.tankDetails && (() => {
-                            const action = inspection.tankDetails.correctiveActions[String(q.id)];
-                            return <div className="mt-3 rounded border border-border p-3 text-sm space-y-1">
-                              <p className="whitespace-pre-wrap"><strong>Action planned / taken:</strong> {action?.action || "Not recorded"}</p>
-                              <p><strong>Responsible person:</strong> {action?.owner || "Unassigned"}</p>
-                              <p><strong>Target date:</strong> {action?.dueDate || "Not set"}</p>
-                              <p><strong>Verified complete date:</strong> {action?.completedDate || "Open / not recorded"}</p>
-                            </div>;
-                          })()}
                         </div>
                       </div>
                     </div>

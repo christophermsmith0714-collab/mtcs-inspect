@@ -1,5 +1,5 @@
 import PDFDocument from "pdfkit";
-import { tankFields, TANK_SCOPE, tankChecklistComplete, type TankDetails } from "@shared/tank";
+import { tankChecklistComplete } from "@shared/tank";
 
 export interface TankPdfData {
   inspectionName?: string;
@@ -8,132 +8,137 @@ export interface TankPdfData {
   inspector: string;
   date: string;
   generalComments?: string;
-  tankDetails?: TankDetails | null;
   questions: { id: number; section: string; questionText: string; recommendResponse?: string }[];
   answers: { questionId: number; answer: string; comments?: string; photos?: string[] }[];
 }
 
 export function generateTankPDF(data: TankPdfData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: "LETTER", margins: { top: 82, bottom: 62, left: 48, right: 48 }, bufferPages: true,
-      info: { Title: `Tank inspection checklist - ${data.tankDetails?.tankId || "Unidentified tank"}`, Author: "Midwest Training and Consulting Services" } });
+    const doc = new PDFDocument({
+      size: "LETTER", margins: { top: 36, bottom: 66, left: 36, right: 36 }, bufferPages: true,
+      info: { Title: data.inspectionName || "Tank Inspection Checklist", Author: "Midwest Training and Consulting Services" },
+    });
     const chunks: Buffer[] = [];
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
-    const green = "#14532d", ink = "#1f2937", muted = "#64748b";
-    const width = 516, bottom = 718;
+    const blue = "#548dd4"; // Sampled from the supplied integrity report.
+    const x = 36, width = 540, questionWidth = 464, answerWidth = 38, bottom = 718;
     const byId = new Map(data.answers.map(a => [a.questionId, a]));
-    const complete = tankChecklistComplete(data.questions, data.answers, data.tankDetails);
-    let textStyle = { font: "Helvetica", size: 9, color: ink };
-    const header = () => {
-      doc.rect(0, 0, 612, 64).fill(green);
-      doc.fillColor("white").font("Helvetica-Bold").fontSize(17).text("TANK INSPECTION CHECKLIST", 48, 18, { width, lineBreak: false });
-      doc.font("Helvetica").fontSize(9).text(`${complete ? "Completed checklist" : "DRAFT - incomplete checklist"}  |  Tank: ${data.tankDetails?.tankId || "Not recorded"}`, 48, 43, { width, height: 12, ellipsis: true });
-      // PDFKit can add a page inside a long text block. Restore its style so
-      // continued observations do not inherit the white header text.
-      doc.font(textStyle.font).fontSize(textStyle.size).fillColor(textStyle.color);
-      doc.x = 48; doc.y = 82;
+    const complete = tankChecklistComplete(data.questions, data.answers);
+    let y = 36;
+    const plain = (size = 9) => doc.font("Helvetica").fontSize(size).fillColor("black");
+    const measure = (text: string, textWidth: number, bold = false) => {
+      doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9);
+      return doc.heightOfString(text, { width: textWidth, lineGap: 1 });
     };
-    header();
-    doc.on("pageAdded", header);
-    const ensure = (height: number) => { if (doc.y + height > bottom) doc.addPage(); };
-    const paragraph = (text: string, options: { bold?: boolean; color?: string; size?: number } = {}) => {
-      textStyle = { font: options.bold ? "Helvetica-Bold" : "Helvetica", size: options.size ?? 9, color: options.color ?? ink };
-      doc.font(textStyle.font).fontSize(textStyle.size).fillColor(textStyle.color);
-      const height = doc.heightOfString(text, { width, lineGap: 2 });
-      // Keep a few lines together, then let PDFKit flow long observations.
-      ensure(Math.min(height + 7, 70));
-      doc.text(text, 48, doc.y, { width, lineGap: 2 });
-      doc.y += 7;
+    const newPage = () => { doc.addPage(); y = 36; };
+    const ensure = (height: number) => { if (y + height > bottom) newPage(); };
+    // Flow optional notes independently of the table, including multi-page notes.
+    const paragraph = (text: string, bold = false, color = "black", size = 9) => {
+      doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(size).fillColor(color);
+      ensure(Math.min(doc.heightOfString(text, { width, lineGap: 2 }) + 8, 55));
+      doc.text(text, x, y, { width, lineGap: 2 });
+      y = doc.y + 8;
     };
-    const section = (text: string, followingHeight = 85) => {
-      doc.font("Helvetica-Bold").fontSize(10);
-      const height = doc.heightOfString(text, { width: width - 18 }) + 14;
-      ensure(height + 9 + followingHeight);
-      const y = doc.y;
-      doc.rect(48, y, width, height).fill("#eaf3ed");
-      doc.font("Helvetica-Bold").fontSize(10).fillColor(green).text(text, 57, y + 7, { width: width - 18 });
-      doc.y = y + height + 9;
-    };
-    paragraph(data.inspectionName || "Integrity testing report companion", { bold: true, size: 12 });
-    paragraph(`${data.facility}${data.address ? " | " + data.address : ""}`, { bold: true });
-    paragraph(`Inspector: ${data.inspector}  |  Inspection date: ${data.date}`);
-    paragraph(TANK_SCOPE, { color: muted, size: 8 });
-    section("Tank identification and report reference");
-    for (const [key, label] of tankFields) paragraph(`${label}: ${data.tankDetails?.[key] || "Not recorded"}`);
-    paragraph(`Inspection limitations: ${data.tankDetails?.limitations || "Not recorded"}`);
 
-    const count = (answer: string) => data.questions.filter(q => byId.get(q.id)?.answer === answer).length;
-    const unanswered = data.questions.filter(q => !["yes", "no", "n/a"].includes(byId.get(q.id)?.answer ?? "")).length;
-    section("Response summary");
-    paragraph(`YES: ${count("yes")}    NO: ${count("no")}    N/A: ${count("n/a")}    NOT CHECKED: ${unanswered}`, { bold: true });
-    paragraph("YES = condition satisfactory / record verified. NO = finding requiring follow-up. N/A = not applicable; explain why. NOT CHECKED = no response recorded.", { color: muted, size: 8 });
-    if (!complete) paragraph("Draft: complete tank identification, report reference, all responses, and notes for NO / N/A before finalizing.", { color: "#9a3412" });
-    paragraph("Checklist completion records the inspection observations; it is not a suitability-for-service determination.", { color: muted, size: 8 });
+    doc.font("Times-Bold").fontSize(19).fillColor(blue)
+      .text("Tank Inspection Checklist", x, y, { width, align: "center" });
+    y = doc.y + 8;
+    paragraph(data.inspectionName || data.facility, true);
+    if (data.inspectionName) paragraph(data.facility + (data.address ? " | " + data.address : ""));
+    else if (data.address) paragraph(data.address);
+    paragraph("Inspector: " + data.inspector + "    Date: " + data.date);
+    if (!complete) paragraph("DRAFT - Unanswered items have blank YES / NO cells.", false, blue, 8);
+    paragraph("Findings:", true, blue, 11);
+    y += 2;
 
-    let lastSection = "";
-    data.questions.forEach((q, index) => {
-      if (q.section !== lastSection) {
-        doc.font("Helvetica-Bold").fontSize(9);
-        section(q.section, doc.heightOfString(`${index + 1}. [NOT CHECKED] ${q.questionText}`, { width, lineGap: 2 }) + 40);
-        lastSection = q.section;
-      }
-      const answer = byId.get(q.id);
-      const label = answer?.answer === "yes" ? "YES" : answer?.answer === "no" ? "NO" : answer?.answer === "n/a" ? "N/A" : "NOT CHECKED";
-      doc.font("Helvetica-Bold").fontSize(9);
-      ensure(doc.heightOfString(`${index + 1}. [${label}] ${q.questionText}`, { width, lineGap: 2 }) + 40);
-      paragraph(`${index + 1}. [${label}] ${q.questionText}`, { bold: true, color: label === "NO" ? "#b91c1c" : ink });
-      if (answer?.comments?.trim()) paragraph(`Observation: ${answer.comments}`);
-      if (answer?.photos?.length) paragraph(`Photos: see item ${index + 1} in the photo record (${answer.photos.length}).`, { color: muted, size: 8 });
-      doc.moveTo(48, doc.y).lineTo(564, doc.y).strokeColor("#e2e8f0").lineWidth(0.5).stroke();
-      doc.y += 9;
-    });
-
-    section("Corrective-action log");
-    const findings = data.questions.filter(q => byId.get(q.id)?.answer === "no");
-    if (!findings.length) paragraph("No NO responses recorded. Review any uninspected items and inspection limitations separately.");
-    for (const q of findings) {
-      const action = data.tankDetails?.correctiveActions[String(q.id)];
-      ensure(115);
-      paragraph(`Item ${data.questions.indexOf(q) + 1}: ${q.questionText}`, { bold: true });
-      paragraph(`Finding: ${byId.get(q.id)?.comments || "Not recorded"}`);
-      if (q.recommendResponse) paragraph(`Suggested follow-up: ${q.recommendResponse}`, { color: muted });
-      paragraph(`Action planned / taken: ${action?.action || "Not recorded"}`);
-      paragraph(`Responsible person: ${action?.owner || "Unassigned"}  |  Target date: ${action?.dueDate || "Not set"}`);
-      paragraph(`Verified complete date: ${action?.completedDate || "Open / not recorded"}`);
+    const groups: { section: string; questions: TankPdfData["questions"] }[] = [];
+    for (const q of data.questions) {
+      const last = groups[groups.length - 1];
+      if (last?.section === q.section) last.questions.push(q);
+      else groups.push({ section: q.section, questions: [q] });
     }
-    if (data.generalComments?.trim()) { section("General comments"); paragraph(data.generalComments); }
-    section("Review and acknowledgement");
-    paragraph("Reviewed by: __________________________    Date: __________________");
-    paragraph("Signature: _____________________________________________________");
+    const rowText = (q: TankPdfData["questions"][number]) => {
+      const a = byId.get(q.id);
+      // Preserve a legacy/custom N/A response without treating it as YES or NO.
+      return q.questionText + (a?.photos?.length ? "  (See Photo)" : "") + (a?.answer === "n/a" ? "  (N/A)" : "");
+    };
+    const rowHeight = (q: TankPdfData["questions"][number]) => Math.max(17, measure(rowText(q), questionWidth - 6) + 6);
+    const border = (top: number, height: number) => {
+      doc.lineWidth(0.65).strokeColor("black").rect(x, top, width, height).stroke();
+      for (const cellX of [x + questionWidth, x + questionWidth + answerWidth]) {
+        doc.moveTo(cellX, top).lineTo(cellX, top + height).stroke();
+      }
+    };
+    const tableHeader = (name: string) => {
+      const height = Math.max(17, measure(name, questionWidth - 6, true) + 6);
+      doc.rect(x, y, width, height).fill("#c0c0c0");
+      border(y, height);
+      doc.font("Helvetica-Bold").fontSize(9).fillColor("black").text(name, x + 3, y + 3, { width: questionWidth - 6 });
+      for (const [index, label] of ["YES", "NO"].entries()) {
+        doc.text(label, x + questionWidth + index * answerWidth, y + 3, { width: answerWidth, align: "center" });
+      }
+      y += height;
+    };
 
-    const photos = data.questions.filter(q => byId.get(q.id)?.photos?.length);
-    if (photos.length) { doc.addPage(); section("Photo record"); }
-    for (const q of photos) {
-      const images = byId.get(q.id)?.photos ?? [];
-      images.forEach((photo, i) => {
-        const caption = `Item ${data.questions.indexOf(q) + 1} - Photo ${i + 1}: ${q.questionText}`;
-        doc.font("Helvetica-Bold").fontSize(9);
-        ensure(doc.heightOfString(caption, { width, lineGap: 2 }) + 231);
-        paragraph(caption, { bold: true });
-        const y = doc.y;
-        try {
-          const bytes = Buffer.from(photo.includes(",") ? photo.split(",")[1] : photo, "base64");
-          doc.image(bytes, 48, y, { fit: [width, 210] });
-          doc.y = y + 224;
-        } catch {
-          paragraph("Photo could not be rendered. Review the original inspection record.", { color: "#b91c1c" });
+    for (const [index, group] of groups.entries()) {
+      // Match the two-page grouping in the supplied checklist. Edited templates
+      // still paginate by their measured row heights and repeat table headers.
+      if (index > 0 && group.section === "Tank Manway, Piping & Equipment") newPage();
+      const headerHeight = Math.max(17, measure(group.section, questionWidth - 6, true) + 6);
+      const totalHeight = headerHeight + group.questions.reduce((sum, q) => sum + rowHeight(q), 0);
+      ensure(totalHeight <= bottom - 36 ? totalHeight : headerHeight + rowHeight(group.questions[0]));
+      tableHeader(group.section);
+      for (const q of group.questions) {
+        const height = rowHeight(q);
+        if (y + height > bottom) { newPage(); tableHeader(group.section + " (continued)"); }
+        const answer = byId.get(q.id)?.answer;
+        if (answer === "yes" || answer === "no") {
+          const cellX = x + questionWidth + (answer === "no" ? answerWidth : 0);
+          doc.rect(cellX, y, answerWidth, height).fill(answer === "yes" ? "#008000" : "#ff0000");
         }
-      });
+        border(y, height);
+        plain().text(rowText(q), x + 3, y + 3, { width: questionWidth - 6, lineGap: 1 });
+        y += height;
+      }
+      y += 16;
+    }
+
+    // Only add supporting material when the inspector actually entered it.
+    const notes = data.questions.filter(q => byId.get(q.id)?.comments?.trim());
+    const photos = data.questions.filter(q => byId.get(q.id)?.photos?.length);
+    if (notes.length || data.generalComments?.trim() || photos.length) {
+      newPage();
+      paragraph("Inspection Notes and Photos", true, blue, 12);
+      for (const q of notes) {
+        const label = "Item " + (data.questions.indexOf(q) + 1) + ": " + q.questionText;
+        ensure(measure(label, width, true) + 50);
+        paragraph(label, true);
+        paragraph(byId.get(q.id)!.comments!);
+      }
+      if (data.generalComments?.trim()) { paragraph("General comments", true, blue); paragraph(data.generalComments); }
+      for (const q of photos) {
+        byId.get(q.id)!.photos!.forEach((photo, i) => {
+          const caption = "Item " + (data.questions.indexOf(q) + 1) + " - Photo " + (i + 1) + ": " + q.questionText;
+          ensure(measure(caption, width, true) + 240);
+          paragraph(caption, true);
+          try {
+            const bytes = Buffer.from(photo.includes(",") ? photo.split(",")[1] : photo, "base64");
+            doc.image(bytes, x, y, { fit: [width, 210] });
+            y += 226;
+          } catch { paragraph("Photo could not be rendered. Review the original inspection record."); }
+        });
+      }
     }
 
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
-      doc.moveTo(48, 738).lineTo(564, 738).strokeColor("#cbd5e1").lineWidth(0.5).stroke();
-      doc.font("Helvetica").fontSize(7).fillColor(muted).text("Midwest Training and Consulting Services | midwest-training.com", 48, 747, { lineBreak: false });
-      doc.text(`Page ${i + 1} of ${range.count}`, 490, 747, { lineBreak: false });
+      doc.font("Helvetica-Bold").fontSize(8).fillColor(blue);
+      doc.text("Midwest Training and Consulting Services", x, 744, { lineBreak: false });
+      doc.text("13470 S Arapahoe Drive, Suite 130, Olathe, KS 66062 - 913-712-8077", x, 755, { lineBreak: false });
+      doc.font("Helvetica").fontSize(8).text("Page " + (i + 1) + " of " + range.count, 510, 744, { lineBreak: false });
     }
     doc.end();
   });

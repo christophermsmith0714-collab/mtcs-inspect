@@ -106,12 +106,6 @@ try {
 } catch (_) { /* already exists */ }
 
 // ── Storage Interface ────────────────────────────────────────────────────────
-// Additive migration: leave existing inspection records and templates intact.
-const inspectionColumns = sqlite.prepare("PRAGMA table_info(inspections)").all() as { name: string }[];
-if (!inspectionColumns.some(column => column.name === "tank_details")) {
-  sqlite.exec("ALTER TABLE inspections ADD COLUMN tank_details TEXT DEFAULT NULL");
-}
-
 export interface IStorage {
   // Auth tokens
   createToken(userId: number, userRole: string): AuthToken;
