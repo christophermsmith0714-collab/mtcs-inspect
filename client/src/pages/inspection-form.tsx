@@ -13,8 +13,9 @@ import { useStore } from "@/lib/store";
 import { getTemplate, type Answer, type Question } from "@/lib/data";
 import { Camera, X, CheckCircle, ChevronDown, ChevronUp, Share2, Save, ArrowLeft, FileDown, Loader2, Pencil } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { tankChecklistComplete } from "@shared/tank";
 
-type AnswerState = { answer: "yes" | "no" | ""; comments: string; photos: string[] };
+type AnswerState = { answer: "yes" | "no" | "n/a" | ""; comments: string; photos: string[] };
 
 export default function InspectionFormPage({
   templateId,
@@ -31,6 +32,7 @@ export default function InspectionFormPage({
   const existing = inspectionId ? getInspection(inspectionId) : null;
   const resolvedTemplateId = templateId ?? existing?.templateId ?? 1;
   const template = getTemplate(resolvedTemplateId);
+  const isTank = template?.type === "tank";
 
   // Fetch questions from API — wait for authReady so token is guaranteed set
   const { data: questions = [], isLoading: questionsLoading, error: questionsError } = useQuery<Question[]>({
@@ -149,6 +151,7 @@ export default function InspectionFormPage({
         inspectorName: inspector,
         inspectionDate: date,
         generalComments,
+        ...(isTank ? { status: "in_progress", completedAt: null } : {}),
         inspectionName: inspectionName.trim() || undefined,
       } as any);
       return inspId;
@@ -189,7 +192,6 @@ export default function InspectionFormPage({
       const id = await ensureInspection();
       const allAnswers = buildAnswerArray();
       await saveAnswers(id, allAnswers);
-      await updateInspection(id, { status: "completed", completedAt: new Date().toISOString() });
 
       const payload = buildPayload();
 
@@ -211,9 +213,12 @@ export default function InspectionFormPage({
       }
 
       if (result.pdf) {
+        await updateInspection(id, isTank && !tankChecklistComplete(questions, allAnswers)
+          ? { status: "in_progress", completedAt: null }
+          : { status: "completed", completedAt: new Date().toISOString() });
         const bytes = Uint8Array.from(atob(result.pdf), c => c.charCodeAt(0));
         const blob = new Blob([bytes], { type: "application/pdf" });
-        const filename = `InspectionReport_${facility.replace(/\s+/g, "_")}_${date}.pdf`;
+        const filename = `InspectionReport_${facility.replace(/\s+/g, "_")}${isTank ? "_Tank" : ""}_${date}.pdf`;
 
         // Set state first so modal renders
         setPdfBlob(blob);
@@ -230,7 +235,7 @@ export default function InspectionFormPage({
           document.body.removeChild(a);
           setTimeout(() => URL.revokeObjectURL(url), 5000);
         }, 100);
-      }
+      } else { throw new Error(result.error || "PDF generation failed"); }
     } catch (err) {
       console.error("PDF generation failed:", err);
       toast({ title: "Could not generate report", description: "Please try again.", variant: "destructive" });
@@ -281,7 +286,6 @@ export default function InspectionFormPage({
     try {
       const id = await ensureInspection();
       await saveAnswers(id, buildAnswerArray());
-      await updateInspection(id, { status: "completed", completedAt: new Date().toISOString() });
       const token = sessionStorage.getItem("mtcs_auth_token");
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 180000);
@@ -296,6 +300,9 @@ export default function InspectionFormPage({
         result = await r.json();
       } finally { clearTimeout(timer); }
       if (result.emailSent) {
+        await updateInspection(id, isTank && !tankChecklistComplete(questions, buildAnswerArray())
+          ? { status: "in_progress", completedAt: null }
+          : { status: "completed", completedAt: new Date().toISOString() });
         toast({ title: "Report sent", description: `Emailed to ${emailTo}` });
         setEmailModalOpen(false);
         setEmailTo(""); setEmailCc(""); setEmailMessage("");
@@ -303,7 +310,7 @@ export default function InspectionFormPage({
         if (result.pdf) {
           const bytes = Uint8Array.from(atob(result.pdf), c => c.charCodeAt(0));
           setPdfBlob(new Blob([bytes], { type: "application/pdf" }));
-          setPdfFilename(`InspectionReport_${facility.replace(/\s+/g, "_")}_${date}.pdf`);
+          setPdfFilename(`InspectionReport_${facility.replace(/\s+/g, "_")}${isTank ? "_Tank" : ""}_${date}.pdf`);
         }
       } else {
         toast({ title: "Email failed", description: result.emailError || "Try again", variant: "destructive" });
@@ -322,6 +329,7 @@ export default function InspectionFormPage({
   };
 
   const answeredCount = questions.filter(q => answers[q.id]?.answer).length;
+  const isTankDraft = isTank && !tankChecklistComplete(questions, buildAnswerArray());
   const skippedCount = questions.length - answeredCount;
   const progress = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0;
 
@@ -366,7 +374,7 @@ export default function InspectionFormPage({
               </div>
               <div>
                 <Label htmlFor="inspectionName">Inspection Name *</Label>
-                <Input id="inspectionName" placeholder="e.g. KCAC Monthly SPCC - May 2026" value={inspectionName}
+                <Input id="inspectionName" placeholder={isTank ? "e.g. Tank 1 - Integrity Report Companion" : "e.g. KCAC Monthly SPCC - May 2026"} value={inspectionName}
                   onChange={e => setInspectionName(e.target.value)} className="mt-1" />
               </div>
               <div>
@@ -415,7 +423,7 @@ export default function InspectionFormPage({
       {/* Progress bar */}
       <div className="mb-4">
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-          <span>{answeredCount} of {questions.length} answered{skippedCount > 0 ? ` · ${skippedCount} skipped` : ""}</span>
+          <span>{answeredCount} of {questions.length} answered{skippedCount > 0 ? ` · ${skippedCount} ${isTank ? "not checked" : "skipped"}` : ""}</span>
           <span>{progress}%</span>
         </div>
         <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -480,6 +488,7 @@ export default function InspectionFormPage({
       )}
 
       {/* Sections */}
+      {isTankDraft && <p className="mb-4 text-sm text-muted-foreground">Choose YES or NO for each item. Unanswered items stay blank in the draft PDF. Comments and photos are optional.</p>}
       <div className="space-y-3 pb-24">
         {sections.map(section => {
           const sectionQs = questions.filter(q => q.section === section);
@@ -506,7 +515,7 @@ export default function InspectionFormPage({
                     return (
                       <div key={q.id} className="p-4" data-testid={`question-${q.id}`}>
                         <div className="flex items-start gap-2 mb-3">
-                          <span className="text-xs font-bold text-muted-foreground bg-muted rounded px-1.5 py-0.5 mt-0.5 flex-shrink-0">{idx + 1}</span>
+                          <span className="text-xs font-bold text-muted-foreground bg-muted rounded px-1.5 py-0.5 mt-0.5 flex-shrink-0">{isTank ? questions.indexOf(q) + 1 : idx + 1}</span>
                           <p className="text-sm leading-relaxed">{q.questionText}</p>
                         </div>
 
@@ -515,6 +524,7 @@ export default function InspectionFormPage({
                           {(["yes", "no"] as const).map(opt => (
                             <button key={opt} type="button"
                               data-testid={`answer-${q.id}-${opt}`}
+                              aria-pressed={a.answer === opt}
                               onClick={() => setAnswer(q.id, "answer", answers[q.id]?.answer === opt ? "" : opt)}
                               className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border ${
                                 a.answer === opt
@@ -531,7 +541,8 @@ export default function InspectionFormPage({
                         <div className="ml-6 space-y-2">
                           <Textarea
                             data-testid={`comments-${q.id}`}
-                            placeholder="Add comments..."
+                            placeholder={isTank && a.answer === "no" ? "Describe the finding and its location..." : "Add comments..."}
+                            maxLength={2000}
                             value={a.comments}
                             onChange={e => setAnswer(q.id, "comments", e.target.value)}
                             className="text-sm resize-none"
@@ -674,7 +685,7 @@ export default function InspectionFormPage({
         <Button onClick={handleGenerateReport} className="gap-2 flex-1" disabled={generatingPdf} data-testid="button-complete">
           {generatingPdf
             ? <><Loader2 className="w-4 h-4 animate-spin" />Generating...</>
-            : <><FileDown className="w-4 h-4" />Generate Report</>
+            : <><FileDown className="w-4 h-4" />{isTankDraft ? "Generate Draft PDF" : "Generate Report"}</>
           }
         </Button>
       </div>

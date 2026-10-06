@@ -24,11 +24,25 @@ export type AppUser = {
   subscriptionStatus: string;
 };
 
+// Stable route components preserve the form when saving updates the store.
+function NewInspectionRoute({ params }: { params: { templateId: string } }) {
+  return <InspectionFormPage key={params.templateId} templateId={Number(params.templateId)} inspectionId={null} />;
+}
+function EditInspectionRoute({ params }: { params: { id: string } }) {
+  return <InspectionFormPage key={params.id} templateId={null} inspectionId={Number(params.id)} />;
+}
+function InspectionDetailRoute({ params }: { params: { id: string } }) {
+  return <InspectionDetailPage key={params.id} inspectionId={Number(params.id)} />;
+}
+function ChecklistRoute({ params }: { params: { id: string } }) {
+  return <ChecklistBuilderPage key={params.id} templateId={Number(params.id)} />;
+}
+
 function AppRoutes() {
-  const { currentUser, authReady } = useStore();
+  const { currentUser, authReady, inspectionsReady } = useStore();
 
   // Still checking if the stored token is valid — don't flash login page
-  if (!authReady) {
+  if (!authReady || (currentUser && !inspectionsReady)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -42,24 +56,16 @@ function AppRoutes() {
 
   return (
     <Switch>
-      <Route path="/" component={() => <DashboardPage />} />
-      <Route path="/dashboard" component={() => <DashboardPage />} />
-      <Route path="/inspection/new/:templateId" component={({ params }) => (
-        <InspectionFormPage templateId={parseInt(params.templateId)} inspectionId={null} />
-      )} />
-      <Route path="/inspection/:id/edit" component={({ params }) => (
-        <InspectionFormPage templateId={null} inspectionId={parseInt(params.id)} />
-      )} />
-      <Route path="/inspection/:id" component={({ params }) => (
-        <InspectionDetailPage inspectionId={parseInt(params.id)} />
-      )} />
+      <Route path="/" component={DashboardPage} />
+      <Route path="/dashboard" component={DashboardPage} />
+      <Route path="/inspection/new/:templateId" component={NewInspectionRoute} />
+      <Route path="/inspection/:id/edit" component={EditInspectionRoute} />
+      <Route path="/inspection/:id" component={InspectionDetailRoute} />
       <Route path="/admin" component={() => <AdminPage />} />
       <Route path="/checklists" component={() => <ChecklistsPage />} />
       <Route path="/settings" component={() => <SettingsPage />} />
       <Route path="/stormwater" component={() => <StormwaterFormPage />} />
-      <Route path="/checklists/:id" component={({ params }) => (
-        <ChecklistBuilderPage templateId={parseInt(params.id)} />
-      )} />
+      <Route path="/checklists/:id" component={ChecklistRoute} />
       <Route component={() => <DashboardPage />} />
     </Switch>
   );

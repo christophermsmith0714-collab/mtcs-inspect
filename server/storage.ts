@@ -16,6 +16,7 @@ import {
   type AuthToken,
 } from "@shared/schema";
 import crypto from "crypto";
+import { tankTemplate, tankQuestions } from "@shared/tank-checklist";
 
 // ── DB path: from env or default to ./data/spcc.db ──────────────────────────
 const dbPath = process.env.DB_PATH
@@ -490,4 +491,15 @@ async function seedDatabase() {
   });
 }
 
-seedDatabase().catch(console.error);
+export function ensureTankTemplate() {
+  // A transaction prevents a partial checklist if initialization is interrupted.
+  sqlite.transaction(() => {
+    if (storage.getTemplates().some(t => t.type === "tank")) return;
+    const template = storage.createTemplate(tankTemplate);
+    for (const question of tankQuestions) {
+      storage.createQuestion({ ...question, templateId: template.id });
+    }
+  })();
+}
+
+seedDatabase().then(ensureTankTemplate).catch(console.error);

@@ -4,6 +4,7 @@
  * No cover page.
  */
 import PDFDocument from "pdfkit";
+import { generateTankPDF } from "./tank-pdf";
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 const GREEN       = "#15803d";
@@ -100,6 +101,7 @@ function roundRect(doc: PDFKit.PDFDocument, x: number, y: number, w: number, h: 
 }
 
 export function generatePDF(data: PdfData): Promise<Buffer> {
+  if (data.templateType === "tank") return generateTankPDF(data);
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: "LETTER", bufferPages: true, info: { Title: `${data.templateName} — ${data.facility}` } });
     const chunks: Buffer[] = [];

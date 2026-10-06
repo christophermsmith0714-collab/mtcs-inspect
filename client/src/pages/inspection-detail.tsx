@@ -137,7 +137,9 @@ export default function InspectionDetailPage({ inspectionId }: { inspectionId: n
         {[
           { label: "YES", value: yesCount, cls: "bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-400" },
           { label: "NO",  value: noCount,  cls: "bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-400" },
-          { label: "N/A", value: naCount,  cls: "bg-muted text-muted-foreground" },
+          template?.type === "tank"
+            ? { label: "NOT CHECKED", value: questions.filter(q => !["yes", "no"].includes(answerMap.get(q.id)?.answer ?? "")).length, cls: "bg-muted text-muted-foreground" }
+            : { label: "N/A", value: naCount, cls: "bg-muted text-muted-foreground" },
         ].map(({ label, value, cls }) => (
           <Card key={label} className={`shadow-sm ${cls}`}>
             <CardContent className="py-4 text-center">
@@ -177,7 +179,7 @@ export default function InspectionDetailPage({ inspectionId }: { inspectionId: n
                   return (
                     <div key={q.id} className="p-4">
                       <div className="flex items-start gap-2">
-                        <span className="text-xs font-bold text-muted-foreground bg-muted rounded px-1.5 py-0.5 mt-0.5 flex-shrink-0">{idx + 1}</span>
+                        <span className="text-xs font-bold text-muted-foreground bg-muted rounded px-1.5 py-0.5 mt-0.5 flex-shrink-0">{template?.type === "tank" ? questions.indexOf(q) + 1 : idx + 1}</span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm leading-relaxed mb-2">{q.questionText}</p>
                           <div className="flex items-center gap-2 flex-wrap">

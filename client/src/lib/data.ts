@@ -44,6 +44,7 @@ export type Inspection = {
   inspectionDate: string;
   status: "in_progress" | "completed";
   generalComments: string;
+  inspectionName?: string;
   createdAt: string;
   completedAt?: string;
   answers: Answer[];
