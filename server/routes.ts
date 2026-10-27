@@ -8,6 +8,8 @@ import { z } from "zod/v4";
 import { storage } from "./storage";
 import { insertInspectionSchema } from "@shared/schema";
 import { tankChecklistComplete } from "@shared/tank";
+import { isRecordType, operationalRecordSchema, recordCompletionErrors } from "@shared/operational-records";
+import { generateOperationalPDF } from "./operational-pdf";
 import { requireAuth, requireAdmin } from "./middleware";
 import { generatePDF } from "./pdf_node";
 import { generateStormwaterPDF } from "./stormwater-pdf";
@@ -458,7 +460,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (req.authUserRole !== "admin") {
         body.userId = req.authUserId;
       }
-      const data = insertInspectionSchema.parse(body);
+      const template = storage.getTemplate(body.templateId);
+      if (!template) return res.status(400).json({ error: "Unknown inspection template" });
+      const structured = isRecordType(template.type);
+      if (structured) { body.facilityName = ""; body.facilityAddress = ""; }
+      const data = (structured ? insertInspectionSchema.extend({ facilityName: z.string().max(200) }) : insertInspectionSchema).parse(body);
+      if (structured) {
+        const parsed = operationalRecordSchema.safeParse(data.recordData);
+        if (!parsed.success || parsed.data.kind !== template.type) return res.status(400).json({ error: "Invalid record data" });
+        if (data.status === "completed" && recordCompletionErrors(parsed.data).length) return res.status(400).json({ error: "Fill in the required fields and checks before completing this record" });
+        data.completedAt = data.status === "completed" ? new Date().toISOString() : null;
+      }
       if (storage.getTemplate(data.templateId)?.type === "tank") {
         data.status = "in_progress";
         data.completedAt = null;
@@ -479,6 +491,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       return res.status(403).json({ error: "Forbidden" });
     }
     const updates = { ...req.body };
+    const recordType = storage.getTemplate(inspection.templateId)?.type;
+    if (isRecordType(recordType)) {
+      const parsed = operationalRecordSchema.safeParse(updates.recordData ?? inspection.recordData);
+      if (!parsed.success || parsed.data.kind !== recordType) return res.status(400).json({ error: "Invalid record data" });
+      const result = insertInspectionSchema.extend({ facilityName: z.string().max(200) }).safeParse({
+        ...inspection, ...updates, id: inspection.id, userId: inspection.userId, templateId: inspection.templateId,
+        facilityName: "", facilityAddress: "", recordData: parsed.data,
+        status: updates.status ?? (updates.recordData ? "in_progress" : inspection.status),
+      });
+      if (!result.success) return res.status(400).json({ error: "Invalid record details" });
+      if (result.data.status === "completed" && recordCompletionErrors(parsed.data).length) return res.status(400).json({ error: "Fill in the required fields and checks before completing this record" });
+      result.data.completedAt = result.data.status === "completed" ? (inspection.completedAt || new Date().toISOString()) : null;
+      return res.json(storage.updateInspection(id, result.data));
+    }
     if (storage.getTemplate(inspection.templateId)?.type === "tank") {
       const complete = tankChecklistComplete(storage.getQuestionsByTemplate(inspection.templateId), storage.getAnswersByInspection(id));
       if (updates.status === "completed" && !complete) {
@@ -491,6 +517,23 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
     const updated = storage.updateInspection(id, updates);
     res.json(updated);
+  });
+
+  app.get("/api/inspections/:id/record-pdf", requireAuth, async (req, res) => {
+    const inspection = storage.getInspection(Number(req.params.id));
+    if (!inspection) return res.status(404).json({ error: "Not found" });
+    if (req.authUserRole !== "admin" && inspection.userId !== req.authUserId) return res.status(403).json({ error: "Forbidden" });
+    const parsed = operationalRecordSchema.safeParse(inspection.recordData);
+    if (!parsed.success) return res.status(400).json({ error: "This inspection is not a transfer or drainage record" });
+    try {
+      const pdf = await generateOperationalPDF({ ...inspection, recordData: parsed.data });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${parsed.data.kind}_${inspection.inspectionDate}.pdf"`);
+      res.send(pdf);
+    } catch (error) {
+      console.error("Record PDF generation failed", error);
+      res.status(500).json({ error: "Could not generate the record PDF" });
+    }
   });
 
   app.delete("/api/inspections/:id", requireAuth, (req, res) => {

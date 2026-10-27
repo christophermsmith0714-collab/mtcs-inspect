@@ -8,6 +8,7 @@ import { useStore } from "@/lib/store";
 import { getTemplate } from "@/lib/data";
 import { ClipboardCheck, Droplets, ShieldCheck, Calendar, Trash2, AlertTriangle, ChevronDown, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { isRecordType, visibleInspectionTemplates } from "@shared/operational-records";
 
 export default function DashboardPage() {
   const { currentUser, inspections, deleteInspection, templates } = useStore();
@@ -20,9 +21,7 @@ export default function DashboardPage() {
 
   if (!currentUser) return null;
 
-  const visibleTemplates = currentUser.role === "admin"
-    ? templates
-    : templates.filter(t => (currentUser.assignedTemplates ?? []).includes(t.id));
+  const visibleTemplates = visibleInspectionTemplates(templates, currentUser);
 
   const myInspections = currentUser.role === "admin"
     ? inspections
@@ -114,9 +113,12 @@ export default function DashboardPage() {
                     className="w-full appearance-none rounded-md border border-input bg-background px-3 py-2 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="">Select an inspection type...</option>
-                    {visibleTemplates.map(t => (
-                      <option key={t.id} value={String(t.id)}>{t.name}</option>
-                    ))}
+                    <optgroup label="SPCC Inspections">
+                      {visibleTemplates.filter(t => t.type === "spcc" || isRecordType(t.type)).map(t => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
+                    </optgroup>
+                    <optgroup label="Other Inspections">
+                      {visibleTemplates.filter(t => t.type !== "spcc" && !isRecordType(t.type)).map(t => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
+                    </optgroup>
                   </select>
                   <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 </div>
@@ -193,7 +195,7 @@ export default function DashboardPage() {
                     const template = getTemplate(insp.templateId);
                     return (
                       <option key={insp.id} value={String(insp.id)}>
-                        {insp.facilityName}  ·  {template?.name}  ·  {formatDate(insp.inspectionDate)}  ·  {insp.status === "completed" ? "✓ Completed" : "⋯ In Progress"}
+                        {insp.inspectionName || insp.facilityName || template?.name}  ·  {template?.name}  ·  {formatDate(insp.inspectionDate)}  ·  {insp.status === "completed" ? "✓ Completed" : "⋯ In Progress"}
                       </option>
                     );
                   })}
@@ -215,7 +217,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm">{selectedInspection.facilityName}</span>
+                        <span className="font-medium text-sm">{selectedInspection.inspectionName || selectedInspection.facilityName || template?.name}</span>
                         <Badge variant="outline" className={`text-xs ${selectedInspection.status === "completed" ? "status-completed" : "status-in_progress"}`}>
                           {selectedInspection.status === "completed" ? "Completed" : "In Progress"}
                         </Badge>
@@ -267,7 +269,7 @@ export default function DashboardPage() {
               <h2 className="font-semibold text-base">Delete inspection?</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-5">
-              This will permanently delete the inspection for <strong>{inspToDelete.facilityName}</strong>. This cannot be undone.
+              This will permanently delete <strong>{inspToDelete.inspectionName || inspToDelete.facilityName || "this record"}</strong>. This cannot be undone.
             </p>
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>

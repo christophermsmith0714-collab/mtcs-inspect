@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { apiRequest, setAuthToken, saveUserToSession, loadUserFromSession } from "./queryClient";
 import { setTemplateCache, type Answer, type Template } from "./data";
+import type { OperationalRecord } from "@shared/operational-records";
 
 export type User = {
   id: number;
@@ -23,6 +24,7 @@ export type Inspection = {
   status: "in_progress" | "completed";
   generalComments: string;
   inspectionName?: string;
+  recordData?: OperationalRecord | null;
   completedAt?: string | null;
   createdAt: string;
   answers: Answer[];

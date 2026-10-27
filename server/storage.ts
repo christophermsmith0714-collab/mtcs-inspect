@@ -18,6 +18,7 @@ import {
 import crypto from "crypto";
 import { tankTemplate, tankQuestions } from "@shared/tank-checklist";
 import { revisedTankQuestion } from "./tank-question-upgrade";
+import { recordTemplates } from "@shared/operational-records";
 
 // ── DB path: from env or default to ./data/spcc.db ──────────────────────────
 const dbPath = process.env.DB_PATH
@@ -104,6 +105,9 @@ try {
 } catch (_) { /* already exists */ }
 try {
   sqlite.exec(`ALTER TABLE inspections ADD COLUMN inspection_name TEXT DEFAULT NULL`);
+} catch (_) { /* already exists */ }
+try {
+  sqlite.exec(`ALTER TABLE inspections ADD COLUMN record_data TEXT DEFAULT NULL`);
 } catch (_) { /* already exists */ }
 
 // ── Storage Interface ────────────────────────────────────────────────────────
@@ -510,4 +514,14 @@ export function ensureTankTemplate() {
   })();
 }
 
-seedDatabase().then(ensureTankTemplate).catch(console.error);
+export function ensureRecordTemplates() {
+  sqlite.transaction(() => {
+    for (const template of recordTemplates) {
+      if (!storage.getTemplates().some(existing => existing.type === template.type)) {
+        storage.createTemplate(template);
+      }
+    }
+  })();
+}
+
+seedDatabase().then(() => { ensureTankTemplate(); ensureRecordTemplates(); }).catch(console.error);

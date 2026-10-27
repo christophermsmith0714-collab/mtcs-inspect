@@ -82,8 +82,8 @@ export class MtcsReport {
     return text.slice(0, boundary > 0 ? boundary : low);
   }
 
-  rows(title: string, number: number, allRows: ReportRow[]) {
-    const rows = allRows.filter(row => ["yes", "no", "na", "n/a"].includes(row.answer || ""));
+  rows(title: string, number: number, allRows: ReportRow[], includeUnanswered = false) {
+    const rows = allRows.filter(row => includeUnanswered || ["yes", "no", "na", "n/a"].includes(row.answer || ""));
     if (!rows.length) return;
     const heading = this.sectionHeight(title, true);
     const total = heading + rows.reduce((sum, row) => sum + this.rowHeight(row.text), 0);
@@ -134,16 +134,16 @@ export class MtcsReport {
       .strokeColor(reportColors.line).lineWidth(0.4).stroke();
   }
 
-  finish() {
+  finish(includeContact = true) {
     const range = this.doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       this.doc.switchToPage(i);
       this.doc.moveTo(this.x, 736).lineTo(this.x + this.width, 736).strokeColor(reportColors.blue).lineWidth(0.8).stroke();
       this.doc.font("Helvetica-Bold").fontSize(8).fillColor(reportColors.blue)
         .text("Midwest Training and Consulting Services", this.x, 746, { lineBreak: false });
-      this.doc.font("Helvetica").fontSize(7).fillColor(reportColors.muted)
-        .text("13470 S Arapahoe Drive, Suite 130, Olathe, KS 66062 | 913-712-8077", this.x, 758, { lineBreak: false })
-        .text("MTCS | " + (i + 1) + " / " + range.count, 510, 746, { lineBreak: false });
+      this.doc.font("Helvetica").fontSize(7).fillColor(reportColors.muted);
+      if (includeContact) this.doc.text("13470 S Arapahoe Drive, Suite 130, Olathe, KS 66062 | 913-712-8077", this.x, 758, { lineBreak: false });
+      this.doc.text("MTCS | " + (i + 1) + " / " + range.count, 510, 746, { lineBreak: false });
     }
     this.doc.end();
     return this.result;

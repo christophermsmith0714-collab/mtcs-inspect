@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { isRecordType } from "@shared/operational-records";
 import { useHashLocation } from "wouter/use-hash-location";
 import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -166,7 +167,7 @@ export default function ChecklistsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm">{t.name}</span>
-                      <Badge variant="outline" className="text-xs capitalize">{t.type}</Badge>
+                      <Badge variant="outline" className="text-xs capitalize">{t.type === "spcc" || isRecordType(t.type) ? "SPCC Inspections" : t.type}</Badge>
                     </div>
                     {t.description && (
                       <p className="text-xs text-muted-foreground mt-0.5 truncate">{t.description}</p>
@@ -253,7 +254,7 @@ export default function ChecklistsPage() {
                     <select value={importTargetId} onChange={e => setImportTargetId(e.target.value)}
                       className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                       <option value="">-- select checklist --</option>
-                      {templates.map(t => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
+                      {templates.filter(t => !isRecordType(t.type)).map(t => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
                     </select>
                   </div>
 

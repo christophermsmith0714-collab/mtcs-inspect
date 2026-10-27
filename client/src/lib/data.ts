@@ -1,3 +1,4 @@
+import type { OperationalRecord } from "@shared/operational-records";
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export type User = {
@@ -45,6 +46,7 @@ export type Inspection = {
   status: "in_progress" | "completed";
   generalComments: string;
   inspectionName?: string;
+  recordData?: OperationalRecord | null;
   createdAt: string;
   completedAt?: string;
   answers: Answer[];

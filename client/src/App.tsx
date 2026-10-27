@@ -14,6 +14,8 @@ import ChecklistBuilderPage from "@/pages/checklist-builder";
 import SettingsPage from "@/pages/settings";
 import StormwaterFormPage from "@/pages/stormwater-form";
 import { Loader2 } from "lucide-react";
+import OperationalRecordPage from "@/pages/operational-record";
+import { isRecordType } from "@shared/operational-records";
 
 export type AppUser = {
   id: number;
@@ -26,15 +28,28 @@ export type AppUser = {
 
 // Stable route components preserve the form when saving updates the store.
 function NewInspectionRoute({ params }: { params: { templateId: string } }) {
+  const { templates } = useStore();
+  const template = templates.find(item => item.id === Number(params.templateId));
+  if (!templates.length) return <Loader2 className="m-8 animate-spin" />;
+  if (template && isRecordType(template.type)) return <OperationalRecordPage key={params.templateId} templateId={template.id} inspectionId={null} kind={template.type} />;
   return <InspectionFormPage key={params.templateId} templateId={Number(params.templateId)} inspectionId={null} />;
 }
 function EditInspectionRoute({ params }: { params: { id: string } }) {
+  const { getInspection } = useStore();
+  const inspection = getInspection(Number(params.id));
+  if (inspection?.recordData) return <OperationalRecordPage key={params.id} templateId={inspection.templateId} inspectionId={inspection.id} kind={inspection.recordData.kind} />;
   return <InspectionFormPage key={params.id} templateId={null} inspectionId={Number(params.id)} />;
 }
 function InspectionDetailRoute({ params }: { params: { id: string } }) {
+  const { getInspection } = useStore();
+  const inspection = getInspection(Number(params.id));
+  if (inspection?.recordData) return <OperationalRecordPage key={params.id} templateId={inspection.templateId} inspectionId={inspection.id} kind={inspection.recordData.kind} readOnly />;
   return <InspectionDetailPage key={params.id} inspectionId={Number(params.id)} />;
 }
 function ChecklistRoute({ params }: { params: { id: string } }) {
+  const { templates } = useStore();
+  const template = templates.find(item => item.id === Number(params.id));
+  if (template && isRecordType(template.type)) return <OperationalRecordPage key={params.id} templateId={template.id} inspectionId={null} kind={template.type} />;
   return <ChecklistBuilderPage key={params.id} templateId={Number(params.id)} />;
 }
 
