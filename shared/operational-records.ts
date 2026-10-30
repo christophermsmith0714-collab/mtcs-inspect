@@ -1,6 +1,8 @@
 import { z } from "zod/v4";
+import { quarterlyChecks, quarterlyInspectorStatement, quarterlyReviewStatement } from "./quarterly-stormwater";
 
 export const recordTemplates = [
+  { type: "american_concrete_quarterly", name: "American Concrete Quarterly Inspection", description: "71 site-specific quarterly stormwater checks, corrective actions, closeout dates, and sign-offs." },
   { type: "transfer_log", name: "Tank Level and Fluid Transfer Log", description: "Record tank levels, receiving capacity, and quantities added or removed." },
   { type: "transfer_checklist", name: "Transfer Procedure Checklist", description: "14 transfer checks with YES, NO, N/A, comments, and inspector sign-off." },
   { type: "controlled_drainage", name: "Controlled Drainage Record", description: "Document drainage, water inspection, disposition, and drain closure." },
@@ -10,10 +12,20 @@ export function isRecordType(type?: string): type is RecordType {
   return recordTemplates.some(template => template.type === type);
 }
 
+export function isSpccRecordType(type?: string) {
+  return isRecordType(type) && type !== "american_concrete_quarterly";
+}
+export function recordCategory(type: RecordType) {
+  return type === "american_concrete_quarterly" ? "Stormwater Inspections" : "SPCC Inspections";
+}
+export function recordFacilityName(type: RecordType) {
+  return type === "american_concrete_quarterly" ? "American Concrete" : "";
+}
+
 export function visibleInspectionTemplates<T extends { id: number; type: string }>(templates: T[], user: { role: string; assignedTemplates?: number[] }) {
   const assigned = user.assignedTemplates ?? [];
   const hasSpcc = templates.some(template => template.type === "spcc" && assigned.includes(template.id));
-  return templates.filter(template => user.role === "admin" || assigned.includes(template.id) || (hasSpcc && isRecordType(template.type)));
+  return templates.filter(template => user.role === "admin" || assigned.includes(template.id) || (hasSpcc && isSpccRecordType(template.type)));
 }
 
 export const ullageGuidance = "Ullage is the available space below the verified safe fill limit. Record quantities added or removed, identify the actual receiving container, and verify available receiving capacity before transfer. Do not infer a safe fill limit from shell capacity alone.";
@@ -36,8 +48,24 @@ export const transferChecks = [
 ] as const;
 
 export interface RecordField { key: string; label: string; type?: "date" | "time" | "number" | "textarea" | "yesno"; required?: boolean; signed?: boolean }
-export interface RecordSection { title: string; fields: RecordField[] }
+export interface RecordSection { title: string; description?: string; fields: RecordField[] }
 export const recordSections: Record<RecordType, RecordSection[]> = {
+  american_concrete_quarterly: [
+    { title: "Deficiencies and SWPPP review", description: "A No requires corrective action. Record the completion date for each deficiency. Revise the SWPPP within 90 days if BMPs are not working.", fields: [
+      { key: "stillOpen", label: "Still-open deficiencies / follow-up notes", type: "textarea" },
+      { key: "swpppChange", label: "SWPPP change needed?", type: "yesno", required: true },
+      { key: "swpppDetails", label: "If yes, what needs to change?", type: "textarea" },
+    ] },
+    { title: "Inspector sign-off", description: quarterlyInspectorStatement, fields: [
+      { key: "inspectorPrintName", label: "Inspector printed name", required: true },
+      { key: "signature", label: "Inspector signature (typed name)", required: true },
+      { key: "signatureDate", label: "Inspector signature date", type: "date", required: true },
+    ] },
+    { title: "Allen Beneke (or designee) review", description: quarterlyReviewStatement, fields: [
+      { key: "reviewSignature", label: "Reviewer signature (typed name)", required: true },
+      { key: "reviewDate", label: "Review date", type: "date", required: true },
+    ] },
+  ],
   transfer_log: [],
   transfer_checklist: [
     { title: "Transfer details", fields: [
@@ -104,15 +132,24 @@ function fieldsSchema(fields: RecordField[]) {
   return z.object(Object.fromEntries(fields.map(field => [field.key, fieldSchema(field)]))).strict();
 }
 function recordSchema<T extends RecordType>(kind: T) {
+  const quarterly = kind === "american_concrete_quarterly";
   return z.object({
     kind: z.literal(kind),
     fields: fieldsSchema(recordSections[kind].flatMap(section => section.fields)),
-    rows: z.array(fieldsSchema(kind === "transfer_log" ? transferColumns : kind === "controlled_drainage" ? dispositionColumns : [])).max(kind === "transfer_checklist" ? 0 : 100),
-    checks: z.array(z.object({ answer: z.enum(["", "yes", "no", "n/a"]), comments: text }).strict()).length(kind === "transfer_checklist" ? transferChecks.length : 0),
+    rows: z.array(fieldsSchema(kind === "transfer_log" ? transferColumns : kind === "controlled_drainage" ? dispositionColumns : [])).max(kind === "transfer_checklist" || quarterly ? 0 : 100),
+    checks: z.array(z.object({
+      answer: z.enum(["", "yes", "no", "n/a"]), comments: text,
+      deficiency: text.optional(), correctiveAction: text.optional(), closeoutDate: z.union([z.literal(""), z.iso.date()]).optional(),
+    }).strict().superRefine((check, context) => {
+      for (const key of ["deficiency", "correctiveAction", "closeoutDate"] as const) {
+        if (quarterly ? check[key] === undefined : check[key] !== undefined)
+          context.addIssue({ code: "custom", path: [key], message: quarterly ? "Required quarterly field" : "Unexpected field" });
+      }
+    })).length(quarterly ? quarterlyChecks.length : kind === "transfer_checklist" ? transferChecks.length : 0),
   }).strict();
 }
 export const operationalRecordSchema = z.discriminatedUnion("kind", [
-  recordSchema("transfer_log"), recordSchema("transfer_checklist"), recordSchema("controlled_drainage"),
+  recordSchema("american_concrete_quarterly"), recordSchema("transfer_log"), recordSchema("transfer_checklist"), recordSchema("controlled_drainage"),
 ]);
 export type OperationalRecord = z.infer<typeof operationalRecordSchema>;
 
@@ -123,7 +160,7 @@ export function blankRecord(kind: RecordType): OperationalRecord {
   return {
     kind, fields: blankRow(recordSections[kind].flatMap(section => section.fields)),
     rows: kind === "transfer_log" ? [blankRow(transferColumns)] : [],
-    checks: kind === "transfer_checklist" ? transferChecks.map(() => ({ answer: "" as const, comments: "" })) : [],
+    checks: kind === "american_concrete_quarterly" ? quarterlyChecks.map(() => ({ answer: "" as const, comments: "", deficiency: "", correctiveAction: "", closeoutDate: "" })) : kind === "transfer_checklist" ? transferChecks.map(() => ({ answer: "" as const, comments: "" })) : [],
   };
 }
 
@@ -140,5 +177,19 @@ export function recordCompletionErrors(record: OperationalRecord): string[] {
   if (record.kind === "transfer_checklist") {
     record.checks.forEach((check, index) => { if (!check.answer) errors.push(`Check ${index + 1}`); });
   }
+  if (record.kind === "american_concrete_quarterly") {
+    record.checks.forEach((check, index) => {
+      if (check.answer !== "no") return;
+      if (!check.deficiency?.trim()) errors.push(`Check ${index + 1}: Deficiency found`);
+      if (!check.correctiveAction?.trim()) errors.push(`Check ${index + 1}: Corrective action`);
+    });
+    if (record.fields.swpppChange === "yes" && !record.fields.swpppDetails?.trim()) errors.push("SWPPP change details");
+  }
   return errors;
+}
+
+export function quarterlySummary(record: OperationalRecord) {
+  const deficiencies = record.checks.flatMap((check, index) => check.answer === "no" ? [{ ...check, number: index + 1 }] : []);
+  const open = deficiencies.filter(check => !check.correctiveAction?.trim() || !check.closeoutDate);
+  return { count: deficiencies.length, openNumbers: open.map(check => check.number), allClosed: open.length === 0 };
 }

@@ -1,3 +1,5 @@
+import { QuarterlyChecks } from "@/components/quarterly-checks";
+import { quarterlyGuidance } from "@shared/quarterly-stormwater";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
@@ -12,7 +14,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   blankRecord, blankRow, dispositionColumns, recordCompletionErrors, recordSections,
-  recordTemplates, transferChecks, transferColumns, ullageGuidance,
+  recordTemplates, recordCategory, recordFacilityName, quarterlySummary, transferChecks, transferColumns, ullageGuidance,
   type OperationalRecord, type RecordField, type RecordType,
 } from "@shared/operational-records";
 
@@ -58,13 +60,15 @@ export default function OperationalRecordPage({ templateId, inspectionId, kind, 
   }, [readOnly, existing]);
   const title = recordTemplates.find(template => template.type === kind)!.name;
   const disabled = readOnly || busy;
+  const quarterly = kind === "american_concrete_quarterly";
+  const summary = quarterlySummary(record);
   const updateField = (key: string, value: string) => setRecord(previous => ({ ...previous, fields: { ...previous.fields, [key]: value } }));
 
   async function persist(complete = false) {
     const missing = [!inspector.trim() ? "Completed by" : "", !date ? "Date" : "", ...(complete ? recordCompletionErrors(record) : [])].filter(Boolean);
     if (missing.length) { setErrors(missing); throw new Error("Review the required fields listed above the form."); }
     const payload = {
-      userId: currentUser!.id, templateId, facilityName: "", facilityAddress: "", inspectorName: inspector.trim(),
+      userId: currentUser!.id, templateId, facilityName: recordFacilityName(kind), facilityAddress: "", inspectorName: inspector.trim(),
       inspectionDate: date, inspectionName: name.trim() || title, generalComments: "", recordData: record,
       status: complete ? "completed" as const : "in_progress" as const,
     };
@@ -101,6 +105,7 @@ export default function OperationalRecordPage({ templateId, inspectionId, kind, 
     const item = recordSections[kind][index];
     return <Card key={item.title}><CardContent className="p-4">
       <h2 className="text-base font-semibold mb-3">{item.title}</h2>
+      <>{item.description && <p className="text-sm text-muted-foreground mb-4">{item.description}</p>}</>
       <div className="grid sm:grid-cols-2 gap-4">{item.fields.map(field => <Field key={field.key} field={field} prefix={kind}
         value={record.fields[field.key] || ""} disabled={disabled} onChange={value => updateField(field.key, value)} />)}</div>
     </CardContent></Card>;
@@ -124,10 +129,10 @@ export default function OperationalRecordPage({ templateId, inspectionId, kind, 
 
   return <Layout title={title}>
     <div className="max-w-4xl mx-auto space-y-4 pb-28">
-      <p className="text-sm text-muted-foreground">SPCC Inspections / {title}</p>
+      <p className="text-sm text-muted-foreground">{recordCategory(kind)} / {title}</p>
       <div className="flex flex-wrap items-center justify-between gap-2"><h1 className="text-xl font-bold">{title}</h1>
         <span className="text-sm font-medium">{status === "completed" ? "Completed" : "Draft"}</span></div>
-      {!readOnly && <p className="text-sm text-muted-foreground">Save a draft at any time. Fields marked * and all checklist responses are needed to complete the record.</p>}
+      {!readOnly && <p className="text-sm text-muted-foreground">{quarterly ? "Save a draft at any time. Skip questions that do not apply, or choose N/A. Fields marked * are needed to complete the record; closeout dates may remain blank for open deficiencies." : "Save a draft at any time. Fields marked * and all checklist responses are needed to complete the record."}</p>}
       {errors.length > 0 && <div role="alert" className="border border-red-300 rounded-lg p-4 text-sm">
         <p className="font-semibold">Complete these fields:</p><ul className="list-disc pl-5">{errors.map(error => <li key={error}>{error}</li>)}</ul>
       </div>}
@@ -142,6 +147,19 @@ export default function OperationalRecordPage({ templateId, inspectionId, kind, 
             <Input id="record-date" type="date" value={date} disabled={disabled} onChange={event => setDate(event.target.value)} className="mt-1" /></div>
         </div>
       </CardContent></Card>
+      {quarterly && <>
+        <p className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-4 text-sm leading-relaxed">{quarterlyGuidance}</p>
+        <QuarterlyChecks checks={record.checks} disabled={disabled} onChange={(index, patch) => setRecord(previous => ({ ...previous,
+          checks: previous.checks.map((check, i) => i === index ? { ...check, ...patch } : check),
+        }))} />
+        <Card><CardContent className="p-4 space-y-2 text-sm">
+          <h2 className="font-semibold">Quarterly closeout summary</h2>
+          <p>Deficiencies (NO items): {summary.count}</p>
+          <p>{summary.count === 0 ? "No deficiencies recorded." : summary.allClosed ? "All deficiencies have a corrective action and closeout date." : `Still open: checks ${summary.openNumbers.join(", ")}`}</p>
+          <p className="text-muted-foreground">{record.checks.filter(check => check.answer === "n/a").length} marked N/A · {record.checks.filter(check => !check.answer).length} skipped / unanswered</p>
+        </CardContent></Card>
+        {section(0)}{section(1)}{section(2)}
+      </>}
       {kind === "transfer_log" && <><p className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-4 text-sm leading-relaxed">{ullageGuidance}</p>{rowEditor(transferColumns, "Transfer entries")}</>}
       {kind === "transfer_checklist" && <>
         {section(0)}

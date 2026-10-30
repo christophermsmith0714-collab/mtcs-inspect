@@ -8,7 +8,7 @@ import { z } from "zod/v4";
 import { storage } from "./storage";
 import { insertInspectionSchema } from "@shared/schema";
 import { tankChecklistComplete } from "@shared/tank";
-import { isRecordType, operationalRecordSchema, recordCompletionErrors } from "@shared/operational-records";
+import { isRecordType, recordFacilityName, operationalRecordSchema, recordCompletionErrors } from "@shared/operational-records";
 import { generateOperationalPDF } from "./operational-pdf";
 import { requireAuth, requireAdmin } from "./middleware";
 import { generatePDF } from "./pdf_node";
@@ -463,7 +463,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const template = storage.getTemplate(body.templateId);
       if (!template) return res.status(400).json({ error: "Unknown inspection template" });
       const structured = isRecordType(template.type);
-      if (structured) { body.facilityName = ""; body.facilityAddress = ""; }
+      if (structured) { body.facilityName = recordFacilityName(template.type as Parameters<typeof recordFacilityName>[0]); body.facilityAddress = ""; }
       const data = (structured ? insertInspectionSchema.extend({ facilityName: z.string().max(200) }) : insertInspectionSchema).parse(body);
       if (structured) {
         const parsed = operationalRecordSchema.safeParse(data.recordData);
@@ -497,7 +497,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!parsed.success || parsed.data.kind !== recordType) return res.status(400).json({ error: "Invalid record data" });
       const result = insertInspectionSchema.extend({ facilityName: z.string().max(200) }).safeParse({
         ...inspection, ...updates, id: inspection.id, userId: inspection.userId, templateId: inspection.templateId,
-        facilityName: "", facilityAddress: "", recordData: parsed.data,
+        facilityName: recordFacilityName(recordType), facilityAddress: "", recordData: parsed.data,
         status: updates.status ?? (updates.recordData ? "in_progress" : inspection.status),
       });
       if (!result.success) return res.status(400).json({ error: "Invalid record details" });
@@ -524,7 +524,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!inspection) return res.status(404).json({ error: "Not found" });
     if (req.authUserRole !== "admin" && inspection.userId !== req.authUserId) return res.status(403).json({ error: "Forbidden" });
     const parsed = operationalRecordSchema.safeParse(inspection.recordData);
-    if (!parsed.success) return res.status(400).json({ error: "This inspection is not a transfer or drainage record" });
+    if (!parsed.success) return res.status(400).json({ error: "This inspection does not contain a structured record" });
     try {
       const pdf = await generateOperationalPDF({ ...inspection, recordData: parsed.data });
       res.setHeader("Content-Type", "application/pdf");
