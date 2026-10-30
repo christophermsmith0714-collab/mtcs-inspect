@@ -1,5 +1,6 @@
+import { quarterlyGuidance, quarterlySections } from "@shared/quarterly-stormwater";
 import type { OperationalRecord, RecordField } from "@shared/operational-records";
-import { dispositionColumns, recordSections, recordTemplates, transferChecks, transferColumns, ullageGuidance } from "@shared/operational-records";
+import { dispositionColumns, recordCategory, quarterlySummary, recordSections, recordTemplates, transferChecks, transferColumns, ullageGuidance } from "@shared/operational-records";
 import { MtcsReport, reportDate, reportColors } from "./mtcs-pdf";
 
 export async function generateOperationalPDF(data: {
@@ -9,7 +10,7 @@ export async function generateOperationalPDF(data: {
   const record = data.recordData;
   const title = recordTemplates.find(template => template.type === record.kind)!.name;
   const report = new MtcsReport(title);
-  report.header(title, "MTCS  /  SPCC INSPECTIONS");
+  report.header(title, `MTCS  /  ${recordCategory(record.kind).toUpperCase()}`);
   report.paragraph(data.status === "completed" ? "COMPLETED RECORD" : "DRAFT - INCOMPLETE RECORD", true, reportColors.muted);
   if (data.inspectionName && data.inspectionName !== title) report.field("Record name", data.inspectionName);
   report.paragraph(`${record.kind === "controlled_drainage" ? "Completed by" : "Inspector"}: ${data.inspectorName}    |    ${record.kind === "controlled_drainage" ? "Discharge date" : "Date"}: ${reportDate(data.inspectionDate)}`);
@@ -47,6 +48,10 @@ export async function generateOperationalPDF(data: {
   };
   const section = (index: number) => {
     const item = recordSections[record.kind][index];
+    if (item.description) {
+      report.ensure(report.sectionHeight(item.title) + report.measure(item.description) + 80);
+      report.paragraph(item.description);
+    }
     fieldGrid(item.title, item.fields, record.fields);
   };
   const rows = () => {
@@ -65,5 +70,28 @@ export async function generateOperationalPDF(data: {
     section(1);
   }
   if (record.kind === "controlled_drainage") { section(0); section(1); rows(); section(2); section(3); }
+  if (record.kind === "american_concrete_quarterly") {
+    report.paragraph("Routine Quarterly Inspection Checklist", true);
+    report.paragraph(quarterlyGuidance);
+    report.paragraph("SKIPPED means no response was recorded. N/A means the inspector marked the item not applicable.", false, reportColors.muted);
+    for (const group of quarterlySections) {
+      report.rows(group.title, ++number, group.checks.map(question => {
+        const check = record.checks[question.number - 1];
+        const details: string[] = check.comments ? [`Comments / supporting details: ${check.comments}`] : [];
+        if (check.answer === "no" || check.deficiency || check.correctiveAction || check.closeoutDate) {
+          details.push(`Deficiency found: ${check.deficiency || "Not recorded"}`);
+          details.push(`Corrective action: ${check.correctiveAction || "Not recorded"}`);
+          details.push(`Closeout date: ${check.closeoutDate ? reportDate(check.closeoutDate) : "Not recorded / open"}`);
+        }
+        return { number: question.number, text: [question.text, ...details].join("\n"), answer: check.answer || "skipped" };
+      }), true);
+    }
+    const summary = quarterlySummary(record);
+    report.section("Quarterly closeout summary", ++number);
+    report.paragraph(`Deficiencies (NO items): ${summary.count}`);
+    report.paragraph(summary.count === 0 ? "No deficiencies recorded." : summary.allClosed ? "All deficiencies have a corrective action and closeout date." : `Still open: checks ${summary.openNumbers.join(", ")}`);
+    report.paragraph(`${record.checks.filter(check => check.answer === "n/a").length} marked N/A; ${record.checks.filter(check => !check.answer).length} skipped / unanswered.`);
+    section(0); section(1); section(2);
+  }
   return report.finish(false);
 }

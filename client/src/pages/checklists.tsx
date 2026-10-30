@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { isRecordType } from "@shared/operational-records";
+import { isRecordType, recordCategory } from "@shared/operational-records";
 import { useHashLocation } from "wouter/use-hash-location";
 import Layout from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -167,7 +167,7 @@ export default function ChecklistsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm">{t.name}</span>
-                      <Badge variant="outline" className="text-xs capitalize">{t.type === "spcc" || isRecordType(t.type) ? "SPCC Inspections" : t.type}</Badge>
+                      <Badge variant="outline" className="text-xs capitalize">{isRecordType(t.type) ? recordCategory(t.type) : t.type === "spcc" ? "SPCC Inspections" : t.type}</Badge>
                     </div>
                     {t.description && (
                       <p className="text-xs text-muted-foreground mt-0.5 truncate">{t.description}</p>

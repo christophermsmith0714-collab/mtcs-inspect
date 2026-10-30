@@ -8,7 +8,7 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import {
   blankRecord, blankRow, dispositionColumns, operationalRecordSchema, recordCompletionErrors,
-  recordSections, recordTemplates, transferColumns, visibleInspectionTemplates, type RecordType,
+  recordSections, recordTemplates, recordFacilityName, quarterlySummary, transferColumns, visibleInspectionTemplates, type RecordType,
 } from "../shared/operational-records";
 
 let storage: typeof import("../server/storage").storage;
@@ -26,7 +26,7 @@ function completedRecord(kind: RecordType) {
     receivingContainer: "Receiver 2", receivingCapacity: "50", addedRemoved: "-20.5", comments: "Test transfer",
   }];
   if (kind === "controlled_drainage") record.rows = [{ location: "Portable tank", method: "Collected for disposal", date: "2026-10-26" }];
-  record.checks = record.checks.map((_, index) => ({ answer: index === 0 ? "no" : index === 1 ? "n/a" : "yes", comments: index === 0 ? "Corrected before transfer" : "" }));
+  record.checks = record.checks.map((check, index) => ({ ...check, ...(kind === "american_concrete_quarterly" ? { deficiency: index === 0 ? "Debris at outfall" : "", correctiveAction: index === 0 ? "Remove debris" : "", closeoutDate: "" } : {}), answer: index === 0 ? "no" : index === 1 ? "n/a" : "yes", comments: index === 0 ? "Corrected before transfer" : "" }));
   return record;
 }
 
@@ -71,7 +71,7 @@ describe("SPCC operational records", () => {
     expect(visibleInspectionTemplates(all, { role: "client", assignedTemplates: [] })).toEqual([]);
   });
 
-  for (const { type } of recordTemplates) it(`saves, reloads, completes, exports, and reopens ${type} without facility details`, async () => {
+  for (const { type } of recordTemplates) it(`saves, reloads, completes, exports, and reopens ${type} with the correct site metadata`, async () => {
     const templateId = storage.getTemplates().find(template => template.type === type)!.id;
     const created = await request(app).post("/api/inspections").set("Authorization", `Bearer ${token}`).send({
       templateId, inspectorName: "Test inspector", inspectionDate: "2026-10-26", recordData: blankRecord(type),
@@ -80,7 +80,7 @@ describe("SPCC operational records", () => {
     expect(created.status).toBe(201);
     const id = created.body.id;
     expect(created.body.userId).toBe(ownerId);
-    expect(created.body.facilityName).toBe(""); expect(created.body.facilityAddress).toBe("");
+    expect(created.body.facilityName).toBe(recordFacilityName(type)); expect(created.body.facilityAddress).toBe("");
     expect((await request(app).patch(`/api/inspections/${id}`).set("Authorization", `Bearer ${token}`).send({ status: "completed" })).status).toBe(400);
     const complete = completedRecord(type);
     const saved = await request(app).patch(`/api/inspections/${id}`).set("Authorization", `Bearer ${token}`).send({ recordData: complete, status: "completed" });
@@ -127,5 +127,38 @@ describe("record input and completion rules", () => {
     expect(recordCompletionErrors(record)).toEqual([]);
     record.rows.push(blankRow(dispositionColumns)); expect(recordCompletionErrors(record).length).toBe(3);
     expect(operationalRecordSchema.safeParse({ ...record, fields: { ...record.fields, facilityName: "Unexpected" } }).success).toBe(false);
+  });
+});
+
+
+describe("American Concrete quarterly stormwater checklist", () => {
+  it("keeps the site checklist separately assigned from SPCC forms", () => {
+    const all = storage.getTemplates();
+    const quarterly = all.find(item => item.type === "american_concrete_quarterly")!;
+    expect(visibleInspectionTemplates(all, { role: "client", assignedTemplates: [quarterly.id] })).toEqual([quarterly]);
+    expect(visibleInspectionTemplates(all, { role: "admin" })).toContainEqual(quarterly);
+  });
+  it("allows skipped and N/A checks with open deficiencies, but requires a corrective action for NO", () => {
+    const record = completedRecord("american_concrete_quarterly");
+    record.checks[2].answer = "";
+    expect(record.checks).toHaveLength(71);
+    expect(recordCompletionErrors(record)).toEqual([]);
+    expect(quarterlySummary(record)).toEqual({ count: 1, openNumbers: [1], allClosed: false });
+    record.checks[0].correctiveAction = "";
+    expect(recordCompletionErrors(record)).toContain("Check 1: Corrective action");
+    record.checks[0].correctiveAction = "Debris removed";
+    record.checks[0].closeoutDate = "2026-10-30";
+    expect(quarterlySummary(record).allClosed).toBe(true);
+    expect(operationalRecordSchema.safeParse(record).success).toBe(true);
+    record.checks[0].closeoutDate = "2026-02-30";
+    expect(operationalRecordSchema.safeParse(record).success).toBe(false);
+    expect(operationalRecordSchema.safeParse({ ...record, checks: [] }).success).toBe(false);
+  });
+  it("requires sign-off and details for an identified SWPPP change", () => {
+    const record = completedRecord("american_concrete_quarterly");
+    record.fields.swpppDetails = "";
+    record.fields.reviewSignature = "";
+    expect(recordCompletionErrors(record)).toContain("SWPPP change details");
+    expect(recordCompletionErrors(record)).toContain("Reviewer signature (typed name)");
   });
 });

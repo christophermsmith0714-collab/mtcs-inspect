@@ -115,7 +115,7 @@ export class MtcsReport {
   }
 
   badge(answer: string | undefined, x: number, y: number, neutral = false) {
-    const label = answer === "yes" ? "YES" : answer === "no" ? "NO" : answer === "na" || answer === "n/a" ? "N/A" : "OPEN";
+    const label = answer === "skipped" ? "SKIPPED" : answer === "yes" ? "YES" : answer === "no" ? "NO" : answer === "na" || answer === "n/a" ? "N/A" : "OPEN";
     const color = neutral ? reportColors.navy : answer === "yes" ? "#187347" : answer === "no" ? "#b63737" : reportColors.muted;
     const fill = neutral ? reportColors.pale : answer === "yes" ? "#e8f4ed" : answer === "no" ? "#fdecec" : "#f0f3f7";
     this.doc.roundedRect(x, y, 62, 16, 8).fill(fill);
