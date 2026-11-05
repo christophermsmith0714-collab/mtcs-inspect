@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useStore } from "@/lib/store";
 import { getTemplate, type Answer, type Question } from "@/lib/data";
-import { Camera, X, CheckCircle, ChevronDown, ChevronUp, Share2, Save, ArrowLeft, FileDown, Loader2, Pencil } from "lucide-react";
+import { Camera, X, CheckCircle, ChevronDown, ChevronUp, Share2, Mail, Save, ArrowLeft, FileDown, Loader2, Pencil } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { tankChecklistComplete } from "@shared/tank";
 
@@ -28,6 +28,7 @@ export default function InspectionFormPage({
   const [, navigate] = useHashLocation();
   const { toast } = useToast();
   const { currentUser, authReady, addInspection, updateInspection, saveAnswers, getInspection } = useStore();
+  const accountEmail = currentUser?.email?.trim() ?? "";
 
   // Load existing if editing
   const existing = inspectionId ? getInspection(inspectionId) : null;
@@ -624,8 +625,9 @@ export default function InspectionFormPage({
             <p className="text-xs text-muted-foreground mb-4">The PDF will be generated and emailed as an attachment.</p>
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Send To *</label>
+                <label htmlFor="report-email-to" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Send To *</label>
                 <input
+                  id="report-email-to"
                   type="email"
                   value={emailTo}
                   onChange={e => setEmailTo(e.target.value)}
@@ -633,6 +635,20 @@ export default function InspectionFormPage({
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   autoFocus
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 w-full gap-2"
+                  onClick={() => setEmailTo(accountEmail)}
+                  disabled={sendingEmail || !accountEmail}
+                  data-testid="button-send-to-self"
+                >
+                  <Mail className="w-4 h-4" /> Send myself the report
+                </Button>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Fills in the email address on your account.
+                </p>
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">CC (optional)</label>
